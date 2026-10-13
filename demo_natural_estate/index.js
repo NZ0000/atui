@@ -1,14 +1,14 @@
 /**
- * index.js - Master Integration Script for demo_natural_estate
+ * index.js - Master Integration Script for demo_natural_estate (Upgraded Version)
  * 
  * Responsibilities:
  * 1. Initialize Three.js WebGLRenderer with hardware 4x MSAA, ACESFilmicToneMapping, shadows.
  * 2. Setup PerspectiveCamera and OrbitControls with smooth damping.
- * 3. Configure robust natural lighting: HemisphereLight, directional sun with soft contact shadows, RoomEnvironment.
+ * 3. Configure robust natural lighting: HemisphereLight, directional sun with soft contact shadows, RoomEnvironment, volumetric lighting rays.
  * 4. Import and instantiate all modules: Terrain, Buildings, Vegetation, Props.
  * 5. Setup post-processing pipeline: EffectComposer, RenderPass, UnrealBloomPass.
  * 6. Bind interactive HUD controls (lighting time presets, camera tour viewpoints, layer visibility toggles).
- * 7. Implement main render loop with clock delta updates.
+ * 7. Implement main render loop with clock delta updates and post-processing composer render.
  */
 
 import * as THREE from 'three';
@@ -51,7 +51,7 @@ class NaturalEstateApp {
         // Scene
         this.scene = new THREE.Scene();
         this.scene.background = new THREE.Color(0x87ceeb); // Sky blue
-        this.scene.fog = new THREE.FogExp2(0xa1c4df, 0.0035);
+        this.scene.fog = new THREE.FogExp2(0xa1c4df, 0.0032);
 
         // Camera
         this.camera = new THREE.PerspectiveCamera(
@@ -60,7 +60,7 @@ class NaturalEstateApp {
             0.5,
             1000
         );
-        this.camera.position.set(-36, 12, 56);
+        this.camera.position.set(-36, 14, 58);
 
         // Renderer with Hardware 4x MSAA & ACESFilmicToneMapping
         this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -89,7 +89,7 @@ class NaturalEstateApp {
         this.scene.add(this.hemiLight);
 
         // 2. Main Directional Sunlight (Warm natural noon sun)
-        this.dirLight = new THREE.DirectionalLight(0xfffaed, 2.2);
+        this.dirLight = new THREE.DirectionalLight(0xfffaed, 2.3);
         this.dirLight.position.set(60, 80, 40);
         this.dirLight.castShadow = true;
         this.dirLight.shadow.mapSize.width = 2048;
@@ -108,6 +108,31 @@ class NaturalEstateApp {
         // 3. Environment lighting for realistic reflections
         const pmremGenerator = new THREE.PMREMGenerator(this.renderer);
         this.scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
+
+        // 4. Atmospheric Volumetric Light Beams (Sun Rays)
+        this._initVolumetricRays();
+    }
+
+    _initVolumetricRays() {
+        this.rayGroup = new THREE.Group();
+        const rayGeo = new THREE.ConeGeometry(8, 60, 16, 1, true);
+        const rayMat = new THREE.MeshBasicMaterial({
+            color: 0xfffae0,
+            transparent: true,
+            opacity: 0.12,
+            blending: THREE.AdditiveBlending,
+            side: THREE.DoubleSide,
+            depthWrite: false
+        });
+
+        for (let i = 0; i < 4; i++) {
+            const rayMesh = new THREE.Mesh(rayGeo, rayMat);
+            rayMesh.position.set(-20 + i * 15, 30, -10 + i * 10);
+            rayMesh.rotation.x = 0.35;
+            rayMesh.rotation.z = -0.2 - i * 0.1;
+            this.rayGroup.add(rayMesh);
+        }
+        this.scene.add(this.rayGroup);
     }
 
     _initSceneContent() {
@@ -122,13 +147,13 @@ class NaturalEstateApp {
         });
         this.modules.buildings.addTo(this.scene);
 
-        this.modules.vegetation = new Vegetation(this.scene, 700);
+        this.modules.vegetation = new Vegetation(this.scene, 800);
 
         this.modules.props = new Props(this.scene);
     }
 
     _initPostProcessing() {
-        // Create WebGL 2 RenderTarget with 4x MSAA samples to prevent shader jagged edges
+        // Create WebGL 2 RenderTarget with 4x MSAA samples to prevent shader jagged edges & optical bloom clipping
         const renderTarget = new THREE.WebGLRenderTarget(
             window.innerWidth * window.devicePixelRatio,
             window.innerHeight * window.devicePixelRatio,
@@ -140,12 +165,12 @@ class NaturalEstateApp {
         const renderPass = new RenderPass(this.scene, this.camera);
         this.composer.addPass(renderPass);
 
-        // Cinematic UnrealBloomPass for glowing lights, windows, and specular reflections
+        // Cinematic UnrealBloomPass for glowing lights, windows, water specualrs and atmospheric rays
         const bloomPass = new UnrealBloomPass(
             new THREE.Vector2(window.innerWidth, window.innerHeight),
-            0.35,  // strength
-            0.4,   // radius
-            0.85   // threshold
+            0.42,  // strength
+            0.45,  // radius
+            0.82   // threshold
         );
         this.composer.addPass(bloomPass);
     }
@@ -175,22 +200,24 @@ class NaturalEstateApp {
                 this.scene.fog.color.set(0xa1c4df);
                 this.hemiLight.color.set(0xffffff);
                 this.hemiLight.groundColor.set(0x445533);
-                this.hemiLight.intensity = 0.7;
+                this.hemiLight.intensity = 0.9;
                 this.dirLight.color.set(0xfffaed);
-                this.dirLight.intensity = 2.2;
+                this.dirLight.intensity = 2.3;
                 this.dirLight.position.set(60, 80, 40);
-                this.renderer.toneMappingExposure = 1.1;
+                this.renderer.toneMappingExposure = 1.15;
+                if (this.rayGroup) this.rayGroup.visible = true;
             } else if (preset === 'sunset') {
                 btnSunset.classList.add('active');
                 this.scene.background.set(0x483248);
                 this.scene.fog.color.set(0x523d4c);
                 this.hemiLight.color.set(0xff9e64);
                 this.hemiLight.groundColor.set(0x2a2421);
-                this.hemiLight.intensity = 0.9;
+                this.hemiLight.intensity = 0.95;
                 this.dirLight.color.set(0xff7b39);
                 this.dirLight.intensity = 2.8;
                 this.dirLight.position.set(-80, 25, 60);
                 this.renderer.toneMappingExposure = 1.25;
+                if (this.rayGroup) this.rayGroup.visible = true;
             } else if (preset === 'night') {
                 btnNight.classList.add('active');
                 this.scene.background.set(0x070b12);
@@ -202,35 +229,45 @@ class NaturalEstateApp {
                 this.dirLight.intensity = 0.4;
                 this.dirLight.position.set(20, 60, -40);
                 this.renderer.toneMappingExposure = 0.85;
+                if (this.rayGroup) this.rayGroup.visible = false;
             }
         };
 
-        btnNoon.addEventListener('click', () => setTimePreset('noon'));
-        btnSunset.addEventListener('click', () => setTimePreset('sunset'));
-        btnNight.addEventListener('click', () => setTimePreset('night'));
+        if (btnNoon) btnNoon.addEventListener('click', () => setTimePreset('noon'));
+        if (btnSunset) btnSunset.addEventListener('click', () => setTimePreset('sunset'));
+        if (btnNight) btnNight.addEventListener('click', () => setTimePreset('night'));
 
         // HUD: Camera Viewpoints
-        document.getElementById('cam-overview').addEventListener('click', () => {
+        const camOverview = document.getElementById('cam-overview');
+        const camChalet = document.getElementById('cam-chalet');
+        const camDock = document.getElementById('cam-dock');
+
+        if (camOverview) camOverview.addEventListener('click', () => {
             this._tweenCamera(new THREE.Vector3(40, 22, 58), new THREE.Vector3(5, 4, 10), 1200);
         });
-        document.getElementById('cam-chalet').addEventListener('click', () => {
+        if (camChalet) camChalet.addEventListener('click', () => {
             this._tweenCamera(new THREE.Vector3(-6, 4.5, 22), new THREE.Vector3(-15, 4.5, 38), 1200);
         });
-        document.getElementById('cam-dock').addEventListener('click', () => {
+        if (camDock) camDock.addEventListener('click', () => {
             this._tweenCamera(new THREE.Vector3(28, 4.0, -6), new THREE.Vector3(20, 1.0, -14), 1200);
         });
 
         // HUD: Component Visibility Toggles
-        document.getElementById('toggle-terrain').addEventListener('change', (e) => {
+        const toggleTerrain = document.getElementById('toggle-terrain');
+        const toggleBuildings = document.getElementById('toggle-buildings');
+        const toggleVegetation = document.getElementById('toggle-vegetation');
+        const toggleProps = document.getElementById('toggle-props');
+
+        if (toggleTerrain) toggleTerrain.addEventListener('change', (e) => {
             if (this.modules.terrain) this.modules.terrain.group.visible = e.target.checked;
         });
-        document.getElementById('toggle-buildings').addEventListener('change', (e) => {
+        if (toggleBuildings) toggleBuildings.addEventListener('change', (e) => {
             if (this.modules.buildings) this.modules.buildings.group.visible = e.target.checked;
         });
-        document.getElementById('toggle-vegetation').addEventListener('change', (e) => {
+        if (toggleVegetation) toggleVegetation.addEventListener('change', (e) => {
             if (this.modules.vegetation) this.modules.vegetation.group.visible = e.target.checked;
         });
-        document.getElementById('toggle-props').addEventListener('change', (e) => {
+        if (toggleProps) toggleProps.addEventListener('change', (e) => {
             if (this.modules.props) this.modules.props.propsGroup.visible = e.target.checked;
         });
     }
@@ -243,7 +280,6 @@ class NaturalEstateApp {
         const updateTween = (currentTime) => {
             const elapsed = currentTime - startTime;
             const progress = Math.min(elapsed / duration, 1.0);
-            // Ease out quad
             const ease = 1.0 - (1.0 - progress) * (1.0 - progress);
 
             this.camera.position.lerpVectors(startPos, targetPos, ease);
@@ -268,8 +304,15 @@ class NaturalEstateApp {
         if (this.modules.vegetation) this.modules.vegetation.update(delta);
         if (this.modules.props) this.modules.props.update(delta);
 
+        // Gentle floating animation for volumetric sun rays
+        if (this.rayGroup) {
+            this.rayGroup.children.forEach((ray, i) => {
+                ray.rotation.y += delta * 0.05 * (i % 2 === 0 ? 1 : -1);
+            });
+        }
+
         this.controls.update();
-        this.renderer.render(this.scene, this.camera);
+        this.composer.render();
     }
 }
 

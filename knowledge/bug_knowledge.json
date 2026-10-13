@@ -1,0 +1,96 @@
+{
+  "threejs_webgl": [
+    {
+      "id": "BUG-3D-001",
+      "title": "EffectComposer 导致硬件 MSAA 抗锯齿失效 (Missing RenderTarget MSAA)",
+      "symptom": "开启后期处理 (UnrealBloomPass) 后，发光圈或几何边缘出现剧烈狗牙锯齿。",
+      "root_cause": "Three.js 一旦挂载 EffectComposer，WebGLRenderer 的 antialias: true 默认被跳过失效。",
+      "solution": "必须显式为 WebGLRenderTarget 配置 { samples: 4 } (WebGL 2 硬件 4x MSAA 抗锯齿)，例如：new THREE.WebGLRenderTarget(width, height, { samples: 4 })。",
+      "severity": "CRITICAL"
+    },
+    {
+      "id": "BUG-3D-002",
+      "title": "外部 GLB 模型加载后程序化组件未隐藏 (Floating Mesh / Duplicate Mesh)",
+      "symptom": "加载外部模型后，原先程序化生成的简易部件（如窗户光板 win1/win2、旧车体或占位网格）仍悬浮在场景中穿模。",
+      "root_cause": "程序化网格被直接挂载到 this.group 或 scene，而 GLB 加载成功回调中仅隐藏了 this.proceduralBody (visible = false)。",
+      "solution": "所有临时程序化 mesh 必须统一挂载在 this.proceduralBody 下，或者在 GLB 回调中遍历隐藏所有程序化占位网格。",
+      "severity": "HIGH"
+    },
+    {
+      "id": "BUG-3D-003",
+      "title": "有机曲面/生物模型面片折痕生硬 (Flat Shading on Curved Mesh)",
+      "symptom": "曲面呈现生硬的低模多边形切面折痕，缺乏自然光泽。",
+      "root_cause": "材质启用了 flatShading: true，或者网格顶点法线未计算平滑插值。",
+      "solution": "设置 material.flatShading = false，并在几何体创建后调用 geometry.computeVertexNormals() 进行法线平滑插值。",
+      "severity": "MEDIUM"
+    },
+    {
+      "id": "BUG-3D-004",
+      "title": "InstancedMesh 批量实例化矩阵未刷新",
+      "symptom": "通过 InstancedMesh 生成了大量树木、建筑或道具，但场景中只显示一个或者位置重叠在原点。",
+      "root_cause": "在 setMatrixAt() 设置变换矩阵后，忘记设置 instancedMesh.instanceMatrix.needsUpdate = true。",
+      "solution": "在所有 setMatrixAt 循环完成后，务必调用 instancedMesh.instanceMatrix.needsUpdate = true。",
+      "severity": "HIGH"
+    },
+    {
+      "id": "BUG-3D-005",
+      "title": "裸初级几何体与塑料感 (Anti-Primitive Rule Violation)",
+      "symptom": "场景直接裸拼 BoxGeometry/SphereGeometry，没有倒角，材质缺乏法线贴图和粗糙度，画面呈乐高积木塑料感。",
+      "root_cause": "缺少复合建模 (ExtrudeGeometry, LatheGeometry, TubeGeometry) 以及 Canvas 内存动态程序化 NormalMap / RoughnessMap。",
+      "solution": "使用复合建模与 Canvas 内存法线贴图 (切线空间基准 rgb(128,128,255)) 渲染微观微起伏与结构接缝。",
+      "severity": "HIGH"
+    }
+  ],
+  "javascript_web": [
+    {
+      "id": "BUG-JS-001",
+      "title": "暂时性死区引用错误 (TDZ ReferenceError)",
+      "symptom": "控制台报错: Cannot access 'X' before initialization / ReferenceError。",
+      "root_cause": "在 let / const 变量或类声明之前尝试调用或实例化它们。",
+      "solution": "调整声明顺序，将类与常量声明提升到使用它们的代码上方，或避免循环依赖。",
+      "severity": "HIGH"
+    },
+    {
+      "id": "BUG-JS-002",
+      "title": "动画帧事件监听器或资源泄漏 (Memory Leak in RequestAnimationFrame)",
+      "symptom": "运行一段时间后帧率大幅下降，内存持续增长，浏览器页面卡顿。",
+      "root_cause": "在 tick/animate 循环中不断 new THREE.Mesh / new THREE.Material，或者重复注册 addEventListener。",
+      "solution": "预分配几何体与材质并在循环外复用；组件销毁时调用 dispose() 并移除事件监听器。",
+      "severity": "HIGH"
+    },
+    {
+      "id": "BUG-JS-003",
+      "title": "未捕获的异步资产加载拒绝 (Unhandled Promise Rejection)",
+      "symptom": "网络抖动或模型文件缺失时，页面白屏且 Loading 遮罩层永远不消失。",
+      "root_cause": "GLTFLoader 的 onError 回调未处理，或者缺少容灾降级（Fallback）逻辑。",
+      "solution": "提供 onError 回调，隐藏 Loading 遮罩并降级使用程序化精细模型替代。",
+      "severity": "MEDIUM"
+    }
+  ],
+  "python_backend": [
+    {
+      "id": "BUG-PY-001",
+      "title": "多线程/并发资源竞争与共享状态错乱 (Thread Safety Race Condition)",
+      "symptom": "并发多 Worker 执行时，产生数据覆盖、字典读写冲突或文件写入损坏。",
+      "root_cause": "多个线程并发修改未加锁的全局变量或文件。",
+      "solution": "使用 threading.Lock() 保护关键临界区，或使用线程安全的黑板与消息总线机制。",
+      "severity": "HIGH"
+    },
+    {
+      "id": "BUG-PY-002",
+      "title": "Subprocess 管道缓冲区死锁 (Pipe Deadlock)",
+      "symptom": "执行外部测试或工具命令时，程序永久挂起卡死。",
+      "root_cause": "使用 subprocess.Popen(stdout=PIPE, stderr=PIPE) 时未排空缓冲区导致满载阻塞。",
+      "solution": "使用 proc.communicate(timeout=...)，或使用封装好的 tools.run 工具避免死锁。",
+      "severity": "HIGH"
+    },
+    {
+      "id": "BUG-PY-003",
+      "title": "测试断言作弊与静默逃逸 (Test Cheating / Silent Failure)",
+      "symptom": "测试全部绿灯但实际业务代码未实现或崩溃。",
+      "root_cause": "测试用例使用 try...except: pass 掩盖异常，或测试空函数断言 True。",
+      "solution": "严格执行真实断言与 TDD RED，未实现功能必须报出确凿断言失败。",
+      "severity": "CRITICAL"
+    }
+  ]
+}

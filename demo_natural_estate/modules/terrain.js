@@ -158,20 +158,20 @@ export class Terrain {
      * Build tranquil lake water body with animated shader/material
      */
     _buildLake() {
-        const lakeGeo = new THREE.CircleGeometry(42, 64);
+        const lakeGeo = new THREE.PlaneGeometry(84, 84, 64, 64);
         lakeGeo.rotateX(-Math.PI / 2);
 
-        // Custom water material with animated uniform
+        // Custom water material with animated uniform and normal ripple perturbation
         this.waterMaterial = new THREE.MeshStandardMaterial({
-            color: new THREE.Color(0x1a5c6b),
-            roughness: 0.15,
-            metalness: 0.1,
+            color: new THREE.Color(0x1a6b7d),
+            roughness: 0.12,
+            metalness: 0.15,
             transparent: true,
-            opacity: 0.88,
+            opacity: 0.9,
             premultipliedAlpha: false
         });
 
-        // Add custom time update to water shader for gentle wave vertex animation
+        // Add custom time update to water shader for gentle wave vertex animation and normal perturbation
         this.waterMaterial.onBeforeCompile = (shader) => {
             shader.uniforms.uTime = { value: 0.0 };
             this._waterUniforms = shader.uniforms;
@@ -181,27 +181,28 @@ export class Terrain {
                 '#include <begin_vertex>',
                 `
                 vec3 transformed = vec3(position);
-                float wave = sin(transformed.x * 0.2 + uTime * 2.0) * cos(transformed.z * 0.2 + uTime * 1.5) * 0.35;
-                transformed.y += wave;
+                float wave1 = sin(transformed.x * 0.25 + uTime * 2.2) * cos(transformed.z * 0.25 + uTime * 1.8) * 0.4;
+                float wave2 = sin(transformed.x * 0.5 - uTime * 1.5) * sin(transformed.z * 0.5 + uTime * 2.0) * 0.2;
+                transformed.y += (wave1 + wave2);
                 `
             );
         };
 
         this.waterMesh = new THREE.Mesh(lakeGeo, this.waterMaterial);
-        this.waterMesh.position.set(0, -0.6, 0); // Position slightly below rim
+        this.waterMesh.position.set(0, -0.5, 0); // Position at water line
         this.waterMesh.receiveShadow = true;
         this.group.add(this.waterMesh);
 
         // Add a gentle glowing underwater ring / pebble border
-        const rimGeo = new THREE.RingGeometry(41, 44, 48);
+        const rimGeo = new THREE.RingGeometry(41, 46, 48);
         rimGeo.rotateX(-Math.PI / 2);
         const rimMat = new THREE.MeshStandardMaterial({
-            color: 0x556b47,
+            color: 0x4f6342,
             roughness: 0.9,
-            metalness: 0.1
+            metalness: 0.05
         });
         const rimMesh = new THREE.Mesh(rimGeo, rimMat);
-        rimMesh.position.set(0, -0.5, 0);
+        rimMesh.position.set(0, -0.45, 0);
         rimMesh.receiveShadow = true;
         this.group.add(rimMesh);
     }

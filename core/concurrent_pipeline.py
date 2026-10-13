@@ -31,6 +31,7 @@ from core.tdd_gate import TddGate
 from core.event_bus import default_bus, EventType
 from core.project import get_current_project
 from core.acceptance import AcceptanceChecklist, evaluate_burn_down_gate
+from core.blackboard import get_blackboard
 import tools
 
 class ConcurrentModularPipeline:
@@ -55,6 +56,152 @@ class ConcurrentModularPipeline:
         if os.path.exists(json_path):
             return json_path
         raise FileNotFoundError(f"Agent config for '{role_name}' not found in {self.agents_dir}")
+
+    def resolve_task_modules(
+        self,
+        task: str,
+        modules_spec_json: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Dynamically resolves or deduces modular task specifications without hardcoding domain scenes.
+        Priority:
+        1. modules_spec_json file if provided and valid.
+        2. deliverables/modules_spec.json from Planner agent if existing.
+        3. Extract JSON array block from deliverables/plan.md.
+        4. Dynamic domain-aware synthesis based on task keyword/structure analysis.
+        """
+        proj = get_current_project()
+
+        candidates = []
+        if modules_spec_json:
+            candidates.append(modules_spec_json)
+        candidates.append(os.path.join(proj.path, "deliverables", "modules_spec.json"))
+        candidates.append(os.path.join(os.getcwd(), "deliverables", "modules_spec.json"))
+
+        for cand in candidates:
+            if cand and os.path.exists(cand):
+                try:
+                    with open(cand, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    if isinstance(data, list) and len(data) > 0 and all(isinstance(m, dict) and "name" in m for m in data):
+                        return data
+                except Exception:
+                    pass
+
+        # Try parsing json code block in deliverables/plan.md
+        plan_candidates = [
+            os.path.join(proj.path, "deliverables", "plan.md"),
+            os.path.join(os.getcwd(), "deliverables", "plan.md")
+        ]
+        for p_cand in plan_candidates:
+            if os.path.exists(p_cand):
+                try:
+                    with open(p_cand, "r", encoding="utf-8") as f:
+                        content = f.read()
+                    import re
+                    blocks = re.findall(r"```(?:json)?\s*(\[\s*\{.*?\}\s*\])\s*```", content, re.DOTALL)
+                    for b in blocks:
+                        try:
+                            parsed = json.loads(b)
+                            if isinstance(parsed, list) and len(parsed) > 0 and all(isinstance(m, dict) and "name" in m for m in parsed):
+                                return parsed
+                        except Exception:
+                            continue
+                except Exception:
+                    pass
+
+        # Dynamic domain-aware synthesis based on task keywords (No hardcoding)
+        task_lower = task.lower()
+        if any(w in task_lower for w in ["microservice", "fastapi", "flask", "django", "service", "微服务", "后端", "接口", "鉴权", "订单", "支付"]):
+            return [
+                {
+                    "id": "MOD-1",
+                    "name": "auth_service",
+                    "title": "鉴权与安全服务模块 (Auth & Security Service)",
+                    "file": "services/auth.py",
+                    "test_file": "tests/test_auth.py",
+                    "contract": "导出一个包含 generate_token(), verify_token(), authenticate() 的服务类或接口",
+                    "requirements": "支持安全令牌签名校验与密码哈希，通过独立测试"
+                },
+                {
+                    "id": "MOD-2",
+                    "name": "business_service",
+                    "title": "核心业务与订单处理模块 (Core Business & Order Service)",
+                    "file": "services/business.py",
+                    "test_file": "tests/test_business.py",
+                    "contract": "导出一个包含 process_order(), get_status(), execute_workflow() 的业务类",
+                    "requirements": "状态机流转正确，幂等性保证，通过单元测试"
+                },
+                {
+                    "id": "MOD-3",
+                    "name": "data_gateway",
+                    "title": "数据持久层与网关路由模块 (Data Gateway & Storage)",
+                    "file": "services/gateway.py",
+                    "test_file": "tests/test_gateway.py",
+                    "contract": "导出统一 API 路由定义及数据访问抽象接口",
+                    "requirements": "数据校验、异常捕获、规范化响应输出"
+                }
+            ]
+        elif any(w in task_lower for w in ["3d", "three", "webgl", "场景", "模型", "渲染", "视觉", "自然", "写实", "城市", "科幻"]):
+            return [
+                {
+                    "id": "MOD-1",
+                    "name": "environment",
+                    "title": "基础环境与地貌组件 (Environment & Terrain Module)",
+                    "file": "modules/environment.js",
+                    "test_file": "tests/test_environment.py",
+                    "contract": "导出一个包含 constructor(scene, options)、addTo(scene)、update(delta) 的 Environment 类",
+                    "requirements": "严禁裸立方体。支持微观质感贴图、多层次光影与阴影接收"
+                },
+                {
+                    "id": "MOD-2",
+                    "name": "entities",
+                    "title": "核心主体与构造物组件 (Core Entities & Architecture Module)",
+                    "file": "modules/entities.js",
+                    "test_file": "tests/test_entities.py",
+                    "contract": "导出一个包含 constructor(scene, options)、addTo(scene)、update(delta) 的 Entities 类",
+                    "requirements": "复合几何体造型或高精度外部模型，PBR物理材质，支持加载容灾降级"
+                },
+                {
+                    "id": "MOD-3",
+                    "name": "effects",
+                    "title": "动态粒子与植被特效组件 (Effects & Foliage Module)",
+                    "file": "modules/effects.js",
+                    "test_file": "tests/test_effects.py",
+                    "contract": "导出一个包含 constructor(scene, count)、addTo(scene)、update(delta) 的 Effects 类",
+                    "requirements": "使用批量实例化 (InstancedMesh) 或粒子系统，保持 60FPS"
+                },
+                {
+                    "id": "MOD-4",
+                    "name": "props",
+                    "title": "交互道具与局部照明组件 (Interactive Props Module)",
+                    "file": "modules/props.js",
+                    "test_file": "tests/test_props.py",
+                    "contract": "导出一个包含 constructor(scene)、addTo(scene)、update(delta) 的 Props 类",
+                    "requirements": "配合发光与交互响应，符合整体视效调优"
+                }
+            ]
+        else:
+            return [
+                {
+                    "id": "MOD-1",
+                    "name": "core_engine",
+                    "title": "核心逻辑与业务引擎 (Core Engine Module)",
+                    "file": "modules/core_engine.py" if "py" in task_lower else "modules/core_engine.js",
+                    "test_file": "tests/test_core_engine.py",
+                    "contract": "导出一个核心调度与处理类，提供 run(), process(), reset() 接口",
+                    "requirements": "高内聚、严格契约校验与异常容错"
+                },
+                {
+                    "id": "MOD-2",
+                    "name": "adapter_layer",
+                    "title": "适配器与接口交互层 (Adapter & Interface Module)",
+                    "file": "modules/adapter.py" if "py" in task_lower else "modules/adapter.js",
+                    "test_file": "tests/test_adapter.py",
+                    "contract": "导出外部通信与数据输入输出适配器",
+                    "requirements": "输入校验、格式化处理与接口解耦"
+                }
+            ]
 
     def run_concurrent_pipeline(
         self,
@@ -105,120 +252,44 @@ class ConcurrentModularPipeline:
         planner_harness = AgentHarness(planner_role, model=active_model)
 
         plan_output = "deliverables/plan.md"
-        is_natural = any(w in task for w in ["自然", "真实", "不虚构", "写实", "湖泊", "湖畔", "森林", "乡村", "庄园", "木屋", "田园", "realistic", "natural"])
+        planner_task = (
+            f"目标任务：{task}\n"
+            f"请作为总架构师（Principal Architect），针对用户任务进行【架构规划与模块化领域解耦设计】。\n"
+            f"1. 【评估复杂度与解耦】：若是复合/大型工程，必须拆解为互相独立、可复用、高内聚的子组件模块。\n"
+            f"2. 【输出模块解耦清单】：必须使用 write 工具将模块规格写入 `deliverables/modules_spec.json`（或在 plan.md 中输出 JSON 代码块），格式为：\n"
+            f"   [\n"
+            f"     {{\n"
+            f"       \"id\": \"MOD-1\",\n"
+            f"       \"name\": \"模块短名\",\n"
+            f"       \"title\": \"模块描述性标题\",\n"
+            f"       \"file\": \"源码文件路径(如 modules/xxx.js 或 services/xxx.py)\",\n"
+            f"       \"test_file\": \"独立单测文件路径(如 tests/test_xxx.py)\",\n"
+            f"       \"contract\": \"导出的类/函数名及关键方法接口契约\",\n"
+            f"       \"requirements\": \"模块功能规范与实现要求\"\n"
+            f"     }}\n"
+            f"   ]\n"
+            f"3. 【TDD 契约设计】：为每个模块定义明确的导出类/接口契约（如 addTo(scene)、update(delta)、dispose() 或业务处理接口）。\n"
+            f"4. 【燃尽验收清单】：生成全流程原子化燃尽验收清单至：`deliverables/acceptance_criteria.md`，并将总体架构蓝图写入：{plan_output}。"
+        )
+        planner_res = planner_harness.run(planner_task, output_file=plan_output)
+        stage_records.append({"stage": "planner", "result": planner_res})
 
-        if is_natural:
-            planner_task = (
-                f"目标任务：{task}\n"
-                f"请作为总架构师（Principal Architect），针对此大型自然写实 3D 大场景进行【模块化领域解耦设计】。\n"
-                f"必须拆解为 4 个互相独立、可复用、高内聚的子组件模块（放置于 `modules/` 目录下）：\n"
-                f"1. 自然起伏地形与高山湖泊水体 (terrain.js)\n"
-                f"2. 田园度假木屋与庄园建筑群 (buildings.js，导入 cottage.glb 与木质露台排布)\n"
-                f"3. 真实针阔混交森林与高密度植被 (vegetation.js，强制使用 THREE.InstancedMesh 批量实例化高效渲染)\n"
-                f"4. 湖畔亲水码头与生活生态道具 (props.js，包含木码头、木船、野营石圈及漫步小猫 catv2.glb)\n\n"
-                f"并且为每个模块定义明确的 ES6 导出类/接口契约（如 `addTo(scene)`, `update(delta)`, `dispose()`）。\n"
-                f"设计针对各个组件的原子化测试用例（如 tests/ 目录下的独立单测文件）。\n"
-                f"生成全流程燃尽验收清单至：`deliverables/acceptance_criteria.md`，并将总体架构蓝图写入：{plan_output}"
-            )
-            module_specs = [
-                {
-                    "id": "MOD-1",
-                    "name": "terrain",
-                    "title": "自然起伏地形与高山湖泊组件 (Natural Terrain & Lake Module)",
-                    "file": "modules/terrain.js",
-                    "test_file": "tests/test_terrain.py",
-                    "contract": "导出一个包含 constructor(scene, options)、addTo(scene)、update(delta) 的 Terrain 类。构建自然起伏草地山丘、泥土小径与具备柔和水波荡漾的清澈湖泊水体。",
-                    "requirements": "严禁裸立方体。使用起伏高密度网格与自然草地/泥土 PBR 贴图、反射水体材质（带微风波纹与菲涅尔水面高光反射），接收柔和自然阴影。"
-                },
-                {
-                    "id": "MOD-2",
-                    "name": "buildings",
-                    "title": "乡村度假木屋与田园庄园建筑组件 (Chalet & Architecture Module)",
-                    "file": "modules/buildings.js",
-                    "test_file": "tests/test_buildings.py",
-                    "contract": "导出一个包含 constructor(scene, options)、addTo(scene)、update(delta) 的 Buildings 类。导入高精度欧洲原木度假木屋 (cottage.glb)，并布设湖畔露台、木栅栏与石砌基底。",
-                    "requirements": "写实原木纹理与石砌烟囱质感、物理遮光与漫反射，支持真实尺寸比例，与地形自然结合嵌入。"
-                },
-                {
-                    "id": "MOD-3",
-                    "name": "vegetation",
-                    "title": "真实针阔混交森林与高密度植被组件 (Foliage & Forest Module)",
-                    "file": "modules/vegetation.js",
-                    "test_file": "tests/test_vegetation.py",
-                    "contract": "导出一个包含 constructor(scene, count)、addTo(scene)、update(delta) 的 Vegetation 类。强制使用 THREE.InstancedMesh 批量实例化渲染 500+ 棵自然松针树、高山冷杉、阔叶白桦与野生灌木花草。",
-                    "requirements": "必须使用 THREE.InstancedMesh 单次 Draw Call 批量高效渲染，具备自然随机高低粗细缩放、微小色相明暗随机扰动，保证 60FPS。"
-                },
-                {
-                    "id": "MOD-4",
-                    "name": "props",
-                    "title": "湖畔生活道具与码头休闲生态组件 (Lakeside Props Module)",
-                    "file": "modules/props.js",
-                    "test_file": "tests/test_props.py",
-                    "contract": "导出一个包含 constructor(scene)、addTo(scene)、update(delta) 的 Props 类。生成木质亲水码头、停泊的小木船、营火石圈、木质长椅与漫步小猫 (catv2.glb)。"
-                    ,"requirements": "真实木纹、金属与石材质感，营造静谧恬淡的自然乡村生活氛围，拒绝刺眼不合时宜的霓虹光。"
-                }
-            ]
-        else:
-            planner_task = (
-                f"目标任务：{task}\n"
-                f"请作为总架构师（Principal Architect），针对此大型复合 3D 场景/工程进行【模块化领域解耦设计】。\n"
-                f"必须拆解为 4 个互相独立、可复用、高内聚的子组件模块（例如放置于 `modules/` 目录下）：\n"
-                f"1. 地形地貌与基底 (terrain.js)\n"
-                f"2. 建筑群与民居结构 (buildings.js，支持复合造型或外部模型实例化排布)\n"
-                f"3. 植被生态与森林 (vegetation.js，强制使用 THREE.InstancedMesh 批量实例化高效渲染)\n"
-                f"4. 道具路灯与发光信标 (props.js，带点光源与 Bloom 自发光)\n\n"
-                f"并且为每个模块定义明确的 ES6 导出类/接口契约（如 `addTo(scene)`, `update(delta)`, `dispose()`）。\n"
-                f"设计针对各个组件的原子化测试用例（如 tests/ 目录下的独立单测文件）。\n"
-                f"生成全流程燃尽验收清单至：`deliverables/acceptance_criteria.md`，并将总体架构蓝图写入：{plan_output}"
-            )
-            module_specs = [
-                {
-                    "id": "MOD-1",
-                    "name": "terrain",
-                    "title": "地形与地貌基底组件 (Terrain Module)",
-                    "file": "modules/terrain.js",
-                    "test_file": "tests/test_terrain.py",
-                    "contract": "导出一个包含 constructor(scene, options)、addTo(scene)、update(delta) 的 Terrain 类。创建起伏科幻地貌、网格路径及材质。",
-                    "requirements": "严禁裸立方体，使用起伏网格与微观质感贴图，接收阴影。"
-                },
-                {
-                    "id": "MOD-2",
-                    "name": "buildings",
-                    "title": "未来聚落建筑集群组件 (Buildings Module)",
-                    "file": "modules/buildings.js",
-                    "test_file": "tests/test_buildings.py",
-                    "contract": "导出一个包含 constructor(scene, count)、createBuildingCluster(gridCoords)、addTo(scene) 的 Buildings 类。支持多样化未来房屋结构与高低排布。",
-                    "requirements": "复合几何体造型与金属 PBR 物理材质，门窗自发光，投射与接收阴影。"
-                },
-                {
-                    "id": "MOD-3",
-                    "name": "vegetation",
-                    "title": "生态植被与异星森林组件 (Vegetation Module)",
-                    "file": "modules/vegetation.js",
-                    "test_file": "tests/test_vegetation.py",
-                    "contract": "导出一个包含 constructor(scene, count)、addTo(scene)、update(delta) 的 Vegetation 类。强制使用 THREE.InstancedMesh 批量实例化渲染数百棵树木或植被。",
-                    "requirements": "必须使用 THREE.InstancedMesh 单次 Draw Call 批量高效渲染，具备随机缩放与微旋转，保证 60FPS。"
-                },
-                {
-                    "id": "MOD-4",
-                    "name": "props",
-                    "title": "环境道具与全息路灯组件 (Props Module)",
-                    "file": "modules/props.js",
-                    "test_file": "tests/test_props.py",
-                    "contract": "导出一个包含 constructor(scene)、addTo(scene)、update(delta) 的 Props 类。生成发光全息路灯、能量柱与交互信标。",
-                    "requirements": "部件配置 emissive 自发光与点光源 (PointLight)，产生光学光晕，为街道提供夜间冷暖对比氛围。"
-                }
-            ]
+        # Dynamically resolve module specs without hardcoded domains
+        module_specs = self.resolve_task_modules(task)
 
         # Ensure acceptance checklist is present
         cl_path = os.path.join(proj.path, "deliverables", "acceptance_criteria.md")
         if not os.path.exists(cl_path):
-            chk = AcceptanceChecklist(title=f"分布式模块化大场景任务验收清单: {task[:40]}")
+            is_visual_3d = any(w in task_lower for w in ["3d", "three", "webgl", "场景", "渲染", "视觉", "模型"])
+            chk = AcceptanceChecklist(title=f"分布式模块化任务验收清单: {task[:40]}")
             chk.add_item("环境探针与基础服务就绪且零 CORS 阻断", category="environment", item_id="AC-ENV-01")
             for m in module_specs:
                 chk.add_item(f"子模块 [{m['name']}] 编码实现、接口导出契约与单元测试通过", category="functional", item_id=f"AC-{m['name'].upper()}-01")
-            chk.add_item("总装主控 (index.html / main.js) 整合全部组件并完成空间布局", category="functional", item_id="AC-INT-01")
-            chk.add_item("全场景 360° 环境反射、多重布光与硬件 MSAA 抗锯齿生效，画面无死黑、无乐高塑料感", category="aesthetic", item_id="AC-AES-01")
+            chk.add_item("总装主控入口 (index.html / main.js / 主控脚本) 整合全部组件并正确协同", category="functional", item_id="AC-INT-01")
+            if is_visual_3d:
+                chk.add_item("全场景 360° 环境反射、多重布光与硬件 MSAA 抗锯齿生效，画面无死黑、无乐高塑料感", category="aesthetic", item_id="AC-AES-01")
+            else:
+                chk.add_item("整体交付物视觉/交互体验良好，无阻塞缺陷", category="aesthetic", item_id="AC-AES-01")
             chk.add_item("全量集成测试绿灯通过且控制台零错误", category="general", item_id="AC-GEN-01")
             chk.save_to_file(cl_path)
 
@@ -280,32 +351,21 @@ class ConcurrentModularPipeline:
         integrator_harness = AgentHarness(coder_role, model=active_model)
 
         integration_output = "deliverables/integration_changes.md"
-        if is_natural:
-            integrator_task = (
-                f"目标任务：完成自然写实高山湖畔庄园复合大场景的集成总装配。\n"
-                f"各个独立子模块已由并发 Agent 编写并验证完毕（位于 modules/ 目录下：terrain.js, buildings.js, vegetation.js, props.js）。\n"
-                f"现在请编写或更新项目总入口 `index.html` 以及 `index.js`，完成总装：\n"
-                f"1. 在主脚本中以 ES6 模块导入所有子组件类（Terrain, Buildings, Vegetation, Props）；\n"
-                f"2. 配置真实自然日光照明：透视相机、轨道控制器 (OrbitControls)、45度自然平行日光 (带高品质柔和接触阴影)、真实天空环境光 (Sky / RoomEnvironment)；\n"
-                f"3. 实例化所有子组件并挂载到场景中，合理布设自然空间坐标（湖泊波光粼粼、木屋庄园坐落湖畔草坡、松针与白桦密林环抱山麓、码头停泊小船与漫步小猫）；\n"
-                f"4. 配置硬件 4x MSAA 抗锯齿与自然色调映射 (ACESFilmicToneMapping，呈现明媚自然日光质感，拒绝塑料感或死黑)；\n"
-                f"5. 配备美观现代的高端自然庄园 HUD 交互面板（支持日光时间段切换、各景观组件可见性、湖畔码头/木屋特写导览视角）。\n"
-                f"确保在 index.html 中正确配置 importmap 映射本地 vendor (three: ./vendor/three.module.js, three/addons/: ./vendor/addons/)，避免相对路径 404。\n"
-                f"将完成的代码写入 `index.html` 与 `index.js`，并将集成说明写入：{integration_output}"
-            )
-        else:
-            integrator_task = (
-                f"目标任务：完成复合大场景的集成总装配。\n"
-                f"各个独立子模块已由并发 Agent 编写并验证完毕（位于 modules/ 目录下：terrain.js, buildings.js, vegetation.js, props.js）。\n"
-                f"现在请编写或更新项目总入口 `index.html` 以及总控脚本，完成总装：\n"
-                f"1. 在主脚本中以 ES6 模块导入所有子组件类（Terrain, Buildings, Vegetation, Props）；\n"
-                f"2. 初始化透视相机、轨道控制器 (OrbitControls)、RoomEnvironment 摄影棚环境反射及阴影平行光；\n"
-                f"3. 实例化所有子组件并挂载到场景中，合理布设空间坐标（中央广场、居住区、周边植被森林、发光街灯）；\n"
-                f"4. 配置硬件 4x MSAA 抗锯齿与电影级后期辉光；\n"
-                f"5. 配备美观的 Sci-Fi HUD 交互面板（支持昼夜光照切换、线框模式、各组件可见性开关与巡航视角）。\n"
-                f"确保在 index.html 中正确配置 importmap 映射本地 vendor (three: ./vendor/three.module.js, three/addons/: ./vendor/addons/)。\n"
-                f"将完成的代码写入 `index.html`，并将集成说明写入：{integration_output}"
-            )
+        # Dynamically derive integration instructions from module specs (no hardcoded scenes)
+        module_summary = "\n".join(
+            f"- **{m['title']}** (`{m['file']}`，导出契约：{m['contract']})"
+            for m in module_specs
+        )
+        integrator_task = (
+            f"目标任务：完成复合任务的集成总装配。\n"
+            f"各个独立子模块已由并发 Agent 编写并验证完毕：\n{module_summary}\n\n"
+            f"请编写或更新项目总入口（如 index.html / main.js / 主控脚本 / 服务启动入口，视项目形态而定），完成总装：\n"
+            f"1. 以模块化方式导入全部子组件，按各自导出契约实例化并编排到主流程/主场景中；\n"
+            f"2. 合理布设整体空间或业务流程结构，确保各子模块正确协同、接口契合；\n"
+            f"3. 若项目含 3D/Web 视觉呈现，遵循 rule/rule.md 图形学规范（多层次布光、ACESFilmic 色调映射、硬件 4x MSAA 抗锯齿、PBR 材质）；\n"
+            f"4. 按需配备美观的交互面板（HUD/CLI/REST 入口）供整体控制与导览。\n"
+            f"将完成的代码写入对应入口文件，并将集成说明写入：{integration_output}"
+        )
         integration_res = integrator_harness.run(integrator_task, output_file=integration_output)
         stage_records.append({"stage": "integration_assembly", "result": integration_res})
 
@@ -318,9 +378,9 @@ class ConcurrentModularPipeline:
             master_reviewer = AgentHarness(reviewer_role, model=active_model)
             int_review_out = "deliverables/integration_review.md"
             rev_task = (
-                f"任务目标：复合大场景集成静态审查。\n"
+                f"任务目标：复合任务集成静态审查。\n"
                 f"使用 code_reviewer 工具提取 Git Diff，审查集成代码是否正确导入了各个子模块，\n"
-                f"是否存在 TDZ 作用域问题，是否符合硬件抗锯齿与环境光反射规范。\n"
+                f"是否存在 TDZ/作用域、空指针与并发竞争问题，且符合 rule/rule.md 对应规范。\n"
                 f"输出审查结论至：{int_review_out}，首行标明【审查结果：PASS】或【审查结果：REJECT 驳回】。"
             )
             master_reviewer.run(rev_task, output_file=int_review_out)
@@ -346,8 +406,8 @@ class ConcurrentModularPipeline:
             int_design_out = "deliverables/integration_design_audit.md"
             design_task = (
                 f"任务目标：{task}\n"
-                f"调用 browser_test 对集成后的大场景网页 (index.html) 截取真实视口截图。\n"
-                f"审查大场景在视野中的空间纵深感、植被密度、建筑排列、光影明暗（无死黑）及 HUD 科技感。\n"
+                f"调用 browser_test 对集成后的网页 (index.html) 截取真实视口截图。\n"
+                f"审查整体视觉品质：空间纵深/布局合理性、光影明暗层次（无死黑）、材质质感（无塑料感）及交互面板设计感。\n"
                 f"核验 deliverables/acceptance_criteria.md 中的指标并打勾。\n"
                 f"首行标明【验收结果：PASS】或【验收结果：REJECT 驳回】，输出审美报告至：{int_design_out}"
             )
@@ -362,7 +422,7 @@ class ConcurrentModularPipeline:
         elapsed = round(time.time() - start_time, 2)
 
         summary_content = (
-            f"# 分布式并发多智能体模块化大场景交付报告\n\n"
+            f"# 分布式并发多智能体模块化交付报告\n\n"
             f"## 一、执行概况\n"
             f"- **任务目标**：{task}\n"
             f"- **工作区路径**：`{proj.path}`\n"
@@ -378,7 +438,7 @@ class ConcurrentModularPipeline:
         summary_content += (
             f"\n## 三、两级门禁核验结论\n"
             f"- 单元测试级门禁：已完成所有子模块的独立契约验证与隔离测试。\n"
-            f"- 全局集成级门禁：已完成 `index.html` 场景总装、光影环境渲染及无头浏览器视口审美验收。\n\n"
+            f"- 全局集成级门禁：已完成主控入口总装、集成审查与无头浏览器视口验收。\n\n"
             f"## 四、交付产物导航\n"
             f"- [总体规划方案](deliverables/plan.md)\n"
             f"- [燃尽验收清单](deliverables/acceptance_criteria.md)\n"
@@ -499,6 +559,176 @@ class ConcurrentModularPipeline:
         }
 
     # ==================================================================
+    # CONCURRENT ANALYST SWARM
+    # Multi-concurrent analysis for complex projects or multiple target files.
+    # Flow: Complexity Eval -> Target Partitioning -> Concurrent Workers ->
+    #       Shared Blackboard -> Consolidated Master Analysis Report
+    # ==================================================================
+
+    def run_concurrent_analysis(
+        self,
+        task: str,
+        target_files: Optional[List[str]] = None,
+        project_url: str = "",
+        max_workers: Optional[int] = None,
+        output_file: str = "deliverables/analysis_report.md",
+        model: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Runs multi-concurrent Analyst agents on partitioned target files.
+        Evaluates task complexity, identifies entry points, improvement schemes,
+        refactoring targets, and bugs. Shares findings via SharedBlackboard.
+        """
+        active_model = model or self.model
+        workers_count = max_workers or self.max_workers
+        proj = get_current_project()
+        bb = get_blackboard()
+
+        start_time = time.time()
+        default_bus.publish(EventType.PIPELINE_STEP, {
+            "stage": "concurrent_analysis_start",
+            "task": task,
+            "target_files": target_files,
+            "workers": workers_count
+        })
+
+        # 1. Determine target files if not explicitly provided
+        files = list(target_files) if target_files else []
+        if not files:
+            for root, dirs, fnames in os.walk(proj.path):
+                dirs[:] = [d for d in dirs if d not in {".git", "node_modules", "__pycache__", ".pytest_cache", "dist"}]
+                for fn in fnames:
+                    if fn.endswith((".js", ".ts", ".py", ".html", ".css")) and not fn.startswith("test_"):
+                        rel = os.path.relpath(os.path.join(root, fn), proj.path)
+                        files.append(rel)
+            files = sorted(files)[:12]
+
+        if not files:
+            files = ["index.js"] if os.path.exists(os.path.join(proj.path, "index.js")) else ["main.py"]
+
+        # 2. Evaluate complexity: decide whether to split files into concurrent batches
+        if len(files) <= 1:
+            batches = [files]
+        else:
+            k = min(workers_count, len(files))
+            batches = [[] for _ in range(k)]
+            for i, f in enumerate(files):
+                batches[i % k].append(f)
+
+        default_bus.publish(EventType.PIPELINE_STEP, {
+            "stage": "analyst_batches_scheduled",
+            "batch_count": len(batches),
+            "files_count": len(files)
+        })
+
+        # 3. Concurrent execution via ThreadPoolExecutor
+        worker_results = []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=len(batches)) as executor:
+            future_to_id = {
+                executor.submit(
+                    self._run_single_analyst_worker,
+                    file_batch=batch,
+                    task=task,
+                    active_model=active_model,
+                    worker_id=idx + 1,
+                    project_url=project_url
+                ): idx + 1
+                for idx, batch in enumerate(batches)
+            }
+            for future in concurrent.futures.as_completed(future_to_id):
+                wid = future_to_id[future]
+                try:
+                    res = future.result()
+                    worker_results.append(res)
+                except Exception as exc:
+                    worker_results.append({"success": False, "worker_id": wid, "error": str(exc)})
+
+        # 4. Consolidate results from Shared Blackboard & worker reports
+        bb_bugs = bb.get(topic="bug_findings")
+        bb_schemes = bb.get(topic="improvement_schemes")
+
+        consolidated_lines = [
+            "# 综合多智能体代码分析与架构改造方案 (Consolidated Analysis Report)\n",
+            f"## 一、分析目标与指令\n- **目标指令**：{task}\n- **参与并发分析师**：{len(batches)} 名\n- **分析覆盖文件**：{', '.join(f'`{f}`' for f in files)}\n",
+            "## 二、改造切入点与演进方案建议 (Where & How to Modify)",
+        ]
+
+        if bb_schemes:
+            for s in bb_schemes:
+                consolidated_lines.append(f"- **[{s.get('key')}]** ({s.get('author')}): {s.get('value')}")
+        else:
+            consolidated_lines.append("- 根据项目结构与指令，建议从主控调用与高内聚模块入口处做渐进式修改。")
+
+        consolidated_lines.append("\n## 三、精准问题与隐患清单 (Identified Issues & Gotchas)")
+        all_issues = list(bb_bugs) if bb_bugs else []
+        if all_issues:
+            consolidated_lines.append("| 模块/文件 | 问题描述 | 记录者 |")
+            consolidated_lines.append("|---|---|---|")
+            for iss in all_issues:
+                consolidated_lines.append(f"| `{iss.get('key')}` | {iss.get('value')} | {iss.get('author')} |")
+        else:
+            consolidated_lines.append("*（未发现阻塞性Bug，侧重于架构迭代与功能增强）*")
+
+        consolidated_lines.append("\n## 四、共享黑板条目汇总\n" + bb.export_markdown())
+
+        consolidated_content = "\n".join(consolidated_lines)
+        out_abs = os.path.join(proj.path, output_file)
+        os.makedirs(os.path.dirname(out_abs), exist_ok=True)
+        with open(out_abs, "w", encoding="utf-8") as f:
+            f.write(consolidated_content)
+
+        elapsed = round(time.time() - start_time, 2)
+        return {
+            "success": all(r.get("success", False) for r in worker_results) if worker_results else True,
+            "elapsed_seconds": elapsed,
+            "target_files": files,
+            "batches_count": len(batches),
+            "worker_results": worker_results,
+            "output_file": output_file
+        }
+
+    def _run_single_analyst_worker(
+        self,
+        file_batch: List[str],
+        task: str,
+        active_model: str,
+        worker_id: int,
+        project_url: str = ""
+    ) -> Dict[str, Any]:
+        """Runs an individual analyst agent on an assigned batch of target files."""
+        analyst_role = Role.from_file(self._get_agent_path("analyst"))
+        analyst_harness = AgentHarness(analyst_role, model=active_model)
+        proj = get_current_project()
+        bb = get_blackboard()
+
+        worker_out = f"deliverables/analysis_workers/analyst_{worker_id}.md"
+        browser_hint = ""
+        if project_url:
+            browser_hint = f"\n页面在线地址为：{project_url}，可按需调用 browser_interact 捕获运行时控制台日志与多视角截图。"
+
+        analyst_task = (
+            f"【并发分析师 Worker #{worker_id} 分析任务】\n"
+            f"用户总体指令：{task}\n"
+            f"你所重点分管负责的文件列表：{', '.join(file_batch)}\n"
+            f"{browser_hint}\n"
+            f"你的核心职责不仅是找Bug，更要全面研判改造切入点与演进方案：\n"
+            f"1. 【切入点研判】：根据用户指令，分析从哪个文件、哪个类/函数入手改动最合理。\n"
+            f"2. 【方案对比与决策】：分析怎么改更好？采用何种架构方案（如模块解耦、重构状态机、优化着色器、消除冗余）？\n"
+            f"3. 【精确定位与改动范围】：精确指定需要修改的代码行或导出契约，评估改动影响面，并指出严禁触碰的稳定逻辑。\n"
+            f"4. 【工具与黑板协同】：调用 `analyzer` 工具快速提取符号大纲、搜索关联引用、检测隐患，并调用 `blackboard` (post) 将你的分析发现与改造方案登记至共享黑板。\n"
+            f"将本 Worker 的分析纪要输出保存至：{worker_out}"
+        )
+
+        res = analyst_harness.run(analyst_task, output_file=worker_out)
+        return {
+            "success": res.get("success", False),
+            "worker_id": worker_id,
+            "files": file_batch,
+            "output_file": worker_out,
+            "result": res
+        }
+
+    # ==================================================================
     # ITERATION PIPELINE
     # For improving / debugging EXISTING projects.
     # Flow: Analyst -> Concurrent Fix Coders -> Reviewer -> Designer
@@ -524,7 +754,7 @@ class ConcurrentModularPipeline:
             model: LLM model override.
 
         Pipeline stages:
-          Phase 0  - Analyst: Read all source code + multi-angle browser screenshots -> analysis report
+          Phase 0  - Analyst Swarm: Read code + multi-angle browser screenshots -> analysis report
           Phase 1  - Concurrent Fix Coders: Each coder gets analyst report + one target file to fix
           Phase 2  - Integration Reviewer: Diff check on all changes
           Phase 3  - Designer Visual Audit: browser_interact multi-angle screenshots
@@ -543,40 +773,18 @@ class ConcurrentModularPipeline:
         })
 
         # ------------------------------------------------------------------
-        # Phase 0: Analyst – Code Reading + Browser Multi-Angle Screenshots
+        # Phase 0: Concurrent Analyst Swarm – Deep Code Analysis & Proposals
         # ------------------------------------------------------------------
         default_bus.publish(EventType.PIPELINE_STEP, {"stage": "analyst_pre_pass", "role": "analyst"})
-        analyst_role = Role.from_file(self._get_agent_path("analyst"))
-        analyst_harness = AgentHarness(analyst_role, model=active_model)
         analyst_out = "deliverables/iteration_analysis.md"
-
-        files_hint = ""
-        if target_files:
-            files_hint = f"\n重点分析以下文件：{', '.join(target_files)}"
-
-        browser_hint = ""
-        if project_url:
-            browser_hint = (
-                f"\n请调用 browser_interact 工具，传入 url={project_url}，"
-                f"wait_for_load_ms=12000，并配置以下 steps 序列截取多视角截图：\n"
-                f"  1. wait_for_console（等待模型加载完成日志，contains='loaded'，timeout_ms=15000）\n"
-                f"  2. screenshot（default_view，path=deliverables/iter_view_default.png）\n"
-                f"  3. 若页面有昼夜切换按钮（#btn-sunset）：click → wait_ms(1000) → screenshot(iter_view_sunset.png)\n"
-                f"  4. 若有视角切换按钮（如 #cam-chalet）：click → wait_ms(1500) → screenshot(iter_view_chalet.png)\n"
-                f"对每张截图中的视觉问题进行精确描述（浮动元素、遮挡、锯齿、比例、光照等）。\n"
-            )
-
-        analyst_task = (
-            f"【代码迭代分析任务】\n"
-            f"任务改进目标：{task}\n"
-            f"项目路径：{proj.path}{files_hint}\n"
-            f"{browser_hint}\n"
-            f"请完整阅读项目的全部核心源代码文件（index.js、index.html、modules/ 目录下所有 .js 文件），"
-            f"结合浏览器多视角截图分析，精确识别需要修复的代码问题，输出结构化分析报告至：{analyst_out}\n"
-            f"报告必须包含：问题清单（文件+行号+问题描述）、每张截图的视觉问题描述、修复方向建议（不要直接写代码）。"
+        analyst_res = self.run_concurrent_analysis(
+            task=task,
+            target_files=target_files,
+            project_url=project_url,
+            max_workers=self.max_workers,
+            output_file=analyst_out,
+            model=active_model
         )
-
-        analyst_res = analyst_harness.run(analyst_task, output_file=analyst_out)
         stage_records.append({"stage": "analyst", "result": analyst_res})
 
         # Read analysis report for use by fix coders
