@@ -161,6 +161,8 @@ def run_iteration_pipeline_workflow(
     output_file: str = "deliverables/iteration_summary.md",
     model: Optional[str] = None,
     max_workers: int = 4,
+    conditions: Optional[list] = None,
+    conditions_file: Optional[str] = None,
     event_callback: Optional[Callable[[Event], None]] = None
 ) -> Dict[str, Any]:
     """
@@ -177,6 +179,8 @@ def run_iteration_pipeline_workflow(
         output_file: Path for iteration summary report.
         model: LLM model override.
         max_workers: Number of concurrent fix workers.
+        conditions: Machine-checkable hard conditions (condition_gate spec list/dict).
+        conditions_file: JSON file path containing the condition spec.
     """
     if event_callback:
         subscribe_events(event_callback)
@@ -189,7 +193,9 @@ def run_iteration_pipeline_workflow(
             project_url=project_url,
             target_files=target_files,
             output_file=output_file,
-            model=model
+            model=model,
+            conditions=conditions,
+            conditions_file=conditions_file
         )
         return result
     finally:

@@ -79,6 +79,18 @@ class TddGate:
             rollback_params = {"action": "rollback", "cwd": self.repo_root}
             if rollback_path:
                 rollback_params["path"] = rollback_path
+            else:
+                # Safety: scope rollback to the active project directory only,
+                # never blanket-restore the whole repo (would wipe unrelated work).
+                try:
+                    from core.project import get_current_project
+                    proj = get_current_project()
+                    if proj and proj.path:
+                        rel = os.path.relpath(proj.path, self.repo_root)
+                        if rel and rel != "." and not rel.startswith(".."):
+                            rollback_params["path"] = rel
+                except Exception:
+                    pass
             rollback_res = tools.execute_tool("git_tool", rollback_params)
             default_bus.publish(EventType.GIT_ACTION, {"action": "rolled_back", "result": rollback_res})
             return {

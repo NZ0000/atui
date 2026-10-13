@@ -11,6 +11,7 @@ tools:
   - batch_run
   - web_validator
   - test_runner
+  - condition_gate
 permissions:
   - read
   - write

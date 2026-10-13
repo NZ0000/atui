@@ -12,6 +12,7 @@ tools:
   - browser_interact
   - batch_run
   - vendor_assets
+  - condition_gate
   - web_search
 permissions:
   - read

@@ -145,6 +145,7 @@ def main():
     parser.add_argument("--iterate", "-I", action="store_true", help="启动迭代修复流水线（针对已有项目）: Analyst 分析 -> 并发 Coder 修复 -> 审查 -> 多视角截图验收")
     parser.add_argument("--url", "-u", type=str, default="", help="项目运行 URL（迭代流水线用），例如 http://localhost:8086")
     parser.add_argument("--files", "-f", type=str, default="", help="要修复的目标文件，逗号分隔，例如 modules/buildings.js,modules/vegetation.js")
+    parser.add_argument("--conditions-file", "-G", type=str, default="", help="硬性检测条件规格 JSON 文件（condition_gate 规格），如 deliverables/check_conditions.json")
     parser.add_argument("--workers", "-w", type=int, default=4, help="并发 Worker 线程数 (默认 4)")
     parser.add_argument("--list-agents", action="store_true", help="列出所有可用智能体角色")
     parser.add_argument("--list-tools", action="store_true", help="列出所有可用插件工具")
@@ -224,7 +225,8 @@ def main():
             target_files=target_files_list,
             output_file=output_dest or "deliverables/iteration_summary.md",
             model=model_name,
-            max_workers=args.workers
+            max_workers=args.workers,
+            conditions_file=args.conditions_file or None
         )
         if args.json:
             print(json.dumps(res, ensure_ascii=False, indent=2))

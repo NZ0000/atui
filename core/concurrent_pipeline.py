@@ -740,7 +740,9 @@ class ConcurrentModularPipeline:
         project_url: str = "",
         target_files: Optional[List[str]] = None,
         output_file: str = "deliverables/iteration_summary.md",
-        model: Optional[str] = None
+        model: Optional[str] = None,
+        conditions: Optional[List[Dict[str, Any]]] = None,
+        conditions_file: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Iteration pipeline for improving an existing project.
@@ -752,10 +754,15 @@ class ConcurrentModularPipeline:
                          If None, analyst will discover relevant files automatically.
             output_file: Path for the final summary report.
             model: LLM model override.
+            conditions: Machine-checkable hard conditions (condition_gate spec dict/list).
+                        Evaluated inside every fix loop (hard reject & rework) and globally after Phase 1.
+            conditions_file: Optional JSON file with the condition spec (relative to project root).
 
         Pipeline stages:
           Phase 0  - Analyst Swarm: Read code + multi-angle browser screenshots -> analysis report
           Phase 1  - Concurrent Fix Coders: Each coder gets analyst report + one target file to fix
+                     (hard gates: real file modification + condition_gate conditions)
+          Phase 1.5 - Global condition gate: if hard conditions fail -> one repair wave, re-evaluate
           Phase 2  - Integration Reviewer: Diff check on all changes
           Phase 3  - Designer Visual Audit: browser_interact multi-angle screenshots
           Phase 4  - Git commit & summary report
@@ -765,11 +772,24 @@ class ConcurrentModularPipeline:
         proj = get_current_project()
         stage_records = []
 
+        # Resolve hard verification conditions (condition_gate spec)
+        if conditions_file and not conditions:
+            cf_path = conditions_file if os.path.isabs(conditions_file) else os.path.join(proj.path, conditions_file)
+            try:
+                with open(cf_path, "r", encoding="utf-8") as cf:
+                    conditions = json.load(cf)
+            except Exception as e:
+                default_bus.publish(EventType.PIPELINE_STEP, {
+                    "stage": "conditions_load_error", "error": str(e)
+                })
+        gate_spec = conditions if conditions else None
+
         default_bus.publish(EventType.PIPELINE_STEP, {
             "stage": "iteration_pipeline_start",
             "task": task,
             "project_url": project_url,
-            "target_files": target_files
+            "target_files": target_files,
+            "conditions_enabled": bool(gate_spec)
         })
 
         # ------------------------------------------------------------------
@@ -824,7 +844,8 @@ class ConcurrentModularPipeline:
                     task=task,
                     analysis_content=analysis_content,
                     project_path=proj.path,
-                    active_model=active_model
+                    active_model=active_model,
+                    conditions=gate_spec
                 ): f
                 for f in target_files
             }
@@ -842,6 +863,63 @@ class ConcurrentModularPipeline:
                     fix_results[fname] = {"success": False, "error": str(exc)}
 
         stage_records.append({"stage": "concurrent_fix", "results": fix_results})
+
+        # ------------------------------------------------------------------
+        # Phase 1.5: Global Hard Condition Gate (condition_gate)
+        # Machine-checkable verdict. On failure -> one repair wave, re-evaluate.
+        # ------------------------------------------------------------------
+        conditions_passed = True
+        gate_verdict: Dict[str, Any] = {}
+        if gate_spec:
+            default_bus.publish(EventType.PIPELINE_STEP, {"stage": "global_condition_gate"})
+            gate_res = tools.execute_tool("condition_gate", {"conditions": gate_spec})
+            gate_verdict = gate_res.get("data", {}) if isinstance(gate_res, dict) else {}
+            conditions_passed = bool(gate_verdict.get("passed", False))
+
+            if not conditions_passed:
+                failure_text = gate_verdict.get("failure_summary", "unknown hard condition failures")
+                default_bus.publish(EventType.PIPELINE_STEP, {
+                    "stage": "condition_gate_reject",
+                    "failures": failure_text,
+                    "action": "repair_wave"
+                })
+                # One repair wave: re-dispatch fix workers with failure evidence injected
+                repair_results = {}
+                with concurrent.futures.ThreadPoolExecutor(
+                    max_workers=min(self.max_workers, len(target_files))
+                ) as executor:
+                    future_to_file = {
+                        executor.submit(
+                            self._run_single_fix_pipeline,
+                            target_file=f,
+                            task=task + f"\n\n【硬性条件门禁驳回记录，必须针对性解决】\n{failure_text}",
+                            analysis_content=analysis_content,
+                            project_path=proj.path,
+                            active_model=active_model,
+                            conditions=gate_spec
+                        ): f
+                        for f in target_files
+                    }
+                    for future in concurrent.futures.as_completed(future_to_file):
+                        fname = future_to_file[future]
+                        try:
+                            repair_results[fname] = future.result()
+                        except Exception as exc:
+                            repair_results[fname] = {"success": False, "error": str(exc)}
+                # Merge repair outcomes (later runs win)
+                for fname, res in repair_results.items():
+                    if res.get("success"):
+                        fix_results[fname] = res
+                # Final re-evaluation
+                gate_res2 = tools.execute_tool("condition_gate", {"conditions": gate_spec})
+                gate_verdict = gate_res2.get("data", {}) if isinstance(gate_res2, dict) else {}
+                conditions_passed = bool(gate_verdict.get("passed", False))
+
+            stage_records.append({
+                "stage": "condition_gate",
+                "passed": conditions_passed,
+                "verdict": gate_verdict
+            })
 
         # ------------------------------------------------------------------
         # Phase 2: Integration Reviewer (diff check)
@@ -907,7 +985,10 @@ class ConcurrentModularPipeline:
             summary += f"- `{fname}`: {status}\n"
 
         summary += (
-            f"\n## 四、交付产物\n"
+            f"\n## 四、硬性检测条件门禁结论\n"
+            f"- **condition_gate 判定**：{'🟢 通过 (ALL CONDITIONS PASSED)' if conditions_passed else '🔴 未通过 (CONDITIONS FAILED)'}\n"
+            + (f"- 失败明细：{gate_verdict.get('failure_summary', '')}\n" if not conditions_passed else "")
+            + f"\n## 五、交付产物\n"
             f"- [分析报告](deliverables/iteration_analysis.md)\n"
             f"- [代码审查](deliverables/iteration_review.md)\n"
             f"- [视觉验收](deliverables/iteration_design_audit.md)\n"
@@ -922,7 +1003,9 @@ class ConcurrentModularPipeline:
         git_res = self.tdd_gate.verify_and_git_gate(f"fix(iteration): {task[:60]}")
 
         return {
-            "success": len(failed_files) == 0,
+            "success": len(failed_files) == 0 and conditions_passed,
+            "conditions_passed": conditions_passed,
+            "condition_failures": gate_verdict.get("failure_summary", "") if not conditions_passed else "",
             "elapsed_seconds": elapsed,
             "fixed_files": list(fix_results.keys()),
             "failed_files": failed_files,
@@ -931,13 +1014,26 @@ class ConcurrentModularPipeline:
             "git_commit": git_res
         }
 
+    @staticmethod
+    def _file_signature(path: str) -> Optional[str]:
+        """MD5 signature of a file's content (None if missing). Used to verify real edits."""
+        import hashlib
+        if not os.path.exists(path):
+            return None
+        try:
+            with open(path, "rb") as f:
+                return hashlib.md5(f.read()).hexdigest()
+        except Exception:
+            return None
+
     def _run_single_fix_pipeline(
         self,
         target_file: str,
         task: str,
         analysis_content: str,
         project_path: str,
-        active_model: str
+        active_model: str,
+        conditions: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """Runs Coder -> Reviewer fix cycle for a single file in iteration mode."""
         mod_name = os.path.splitext(os.path.basename(target_file))[0]
@@ -950,6 +1046,8 @@ class ConcurrentModularPipeline:
 
         # Trim analysis to relevant section for this file to save context
         analysis_excerpt = analysis_content[:3000]
+        abs_target = os.path.join(project_path, target_file)
+        sig_before = self._file_signature(abs_target)
 
         while loop < self.max_repair_loops and not passed:
             loop += 1
@@ -961,7 +1059,8 @@ class ConcurrentModularPipeline:
                 f"{analysis_excerpt}\n\n"
                 f"请仔细阅读 `{target_file}` 的完整代码（调用 read 工具），"
                 f"根据分析师报告中与此文件相关的问题，进行精准的最小化修复（不要过度重构，只修复已识别的问题）。\n"
-                f"修复完成后将改动说明写入：{coder_out}"
+                f"若任务涉及外部 3D 资产，必须调用 vendor_assets 工具（download_url + dest_path）将 .glb 资产真实落地到项目 models/ 目录。\n"
+                f"修复完成后必须真实修改 `{target_file}` 的源码内容（只写报告不改代码将判定为失败并触发返工），然后将改动说明写入：{coder_out}"
             )
             if last_error:
                 coder_task += f"\n\n上一轮审查驳回原因：{last_error}\n请有针对性地修正！"
@@ -970,6 +1069,27 @@ class ConcurrentModularPipeline:
             if not code_res.get("success"):
                 last_error = code_res.get("error", "Coder failed.")
                 continue
+
+            # Hard gate: the target file MUST have been actually modified
+            sig_after = self._file_signature(abs_target)
+            if sig_after == sig_before:
+                last_error = (
+                    f"Coder 未实际修改目标文件 `{target_file}`（内容签名未变化），"
+                    f"仅输出报告属于无效交付。请调用 write/edit 工具真正修改源码后重试！"
+                )
+                continue
+
+            # Hard gate: machine-checkable conditions (condition_gate)
+            if conditions:
+                gate = tools.execute_tool("condition_gate", {"conditions": conditions})
+                gate_data = gate.get("data", {}) if isinstance(gate, dict) else {}
+                if not gate_data.get("passed", False):
+                    last_error = (
+                        f"硬性检测条件未通过（condition_gate 驳回）：\n"
+                        f"{gate_data.get('failure_summary', 'unknown')}\n"
+                        f"请严格对照上述失败项逐条修复后重试！"
+                    )
+                    continue
 
             # Review step
             try:
