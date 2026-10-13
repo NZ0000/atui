@@ -30,7 +30,8 @@ class AgentHarness:
 
         self.model = model or self.role.model
         self.client = llm_client or default_client
-        self.max_turns = max_turns
+        cfg_turns = self.client.config.get("harness", {}).get("max_turns", 25)
+        self.max_turns = max_turns if max_turns != 15 else cfg_turns
         self.max_gate_retries = max_gate_retries
 
     def run(

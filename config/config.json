@@ -21,7 +21,7 @@
     }
   },
   "harness": {
-    "max_turns": 15,
+    "max_turns": 25,
     "max_retry_on_gate_failure": 3,
     "tdd_max_repair_loops": 5,
     "temperature": 0.2

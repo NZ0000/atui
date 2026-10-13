@@ -134,10 +134,15 @@ def run_tests(target: str, mode: str = "all", cwd: Optional[str] = None) -> Dict
         test_runner_cmd = [sys.executable, "-m", "pytest", "-v", target]
         framework = "pytest"
 
+    env = os.environ.copy()
+    current_pp = env.get("PYTHONPATH", "")
+    env["PYTHONPATH"] = f"{working_dir}:{current_pp}" if current_pp else working_dir
+
     try:
         proc = subprocess.run(
             test_runner_cmd,
             cwd=working_dir,
+            env=env,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
