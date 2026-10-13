@@ -161,3 +161,45 @@ def test_file_signature_helper():
         with open(p, "w", encoding="utf-8") as f:
             f.write("const a = 2;")
         assert pipeline._file_signature(p) != sig1
+
+
+def test_verify_check_scripts_gate():
+    """
+    Declared CHECK_SCRIPTs in hand-over reports must be syntax-valid AND run
+    with exit code 0 before acceptance. Broken/failing scripts block the gate.
+    """
+    import tempfile
+    pipeline = ConcurrentModularPipeline()
+
+    with tempfile.TemporaryDirectory() as tmp:
+        # No declaration -> pass through
+        assert pipeline._verify_check_scripts(tmp, "no_report.md") == ""
+
+        # Declared script that runs clean -> pass
+        with open(os.path.join(tmp, "report_ok.md"), "w", encoding="utf-8") as f:
+            f.write("# fix report\nCHECK_SCRIPT: checks/ok.py\n")
+        os.makedirs(os.path.join(tmp, "checks"), exist_ok=True)
+        with open(os.path.join(tmp, "checks", "ok.py"), "w") as f:
+            f.write("import sys\nprint('all good')\nsys.exit(0)")
+        assert pipeline._verify_check_scripts(tmp, "report_ok.md") == ""
+
+        # Declared script that fails at runtime -> blocked with evidence
+        with open(os.path.join(tmp, "report_fail.md"), "w", encoding="utf-8") as f:
+            f.write("CHECK_SCRIPT: checks/fail.py\n")
+        with open(os.path.join(tmp, "checks", "fail.py"), "w") as f:
+            f.write("import sys\nprint('missing: oak-tree.glb')\nsys.exit(1)")
+        err = pipeline._verify_check_scripts(tmp, "report_fail.md")
+        assert "运行未通过" in err and "missing" in err
+
+        # Declared script with syntax errors -> blocked at hand-over, never executed
+        with open(os.path.join(tmp, "report_broken.md"), "w", encoding="utf-8") as f:
+            f.write("CHECK_SCRIPT: checks/broken.py\n")
+        with open(os.path.join(tmp, "checks", "broken.py"), "w") as f:
+            f.write("def broken(:\n    pass")
+        err = pipeline._verify_check_scripts(tmp, "report_broken.md")
+        assert "语法未通过" in err
+
+        # Declared but missing script -> blocked
+        with open(os.path.join(tmp, "report_missing.md"), "w", encoding="utf-8") as f:
+            f.write("CHECK_SCRIPT: checks/nope.py\n")
+        assert "不存在" in pipeline._verify_check_scripts(tmp, "report_missing.md")

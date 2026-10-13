@@ -20,8 +20,10 @@ Iteration Pipeline (run_iteration_pipeline):
 
 import os
 import sys
+import re
 import json
 import time
+import subprocess
 import concurrent.futures
 from typing import Dict, Any, List, Optional
 
@@ -1026,6 +1028,54 @@ class ConcurrentModularPipeline:
         except Exception:
             return None
 
+    def _verify_check_scripts(self, project_path: str, report_file: str) -> str:
+        """
+        Hand-over gate for temp check scripts declared by agents.
+        Parses `CHECK_SCRIPT: <path>` lines from the coder report; each script must:
+        1) exist and pass syntax validation (never hand over a broken script), and
+        2) execute with exit code 0 (expected verdict) before acceptance is granted.
+        Returns an error string listing all violations; empty string means pass.
+        """
+        report_abs = os.path.join(project_path, report_file)
+        if not os.path.exists(report_abs):
+            return ""
+        try:
+            with open(report_abs, "r", encoding="utf-8") as rf:
+                report_text = rf.read()
+        except Exception:
+            return ""
+
+        declared = []
+        for line in report_text.splitlines():
+            m = re.search(r"CHECK_SCRIPT:\s*(\S+)", line)
+            if m:
+                declared.append(m.group(1))
+        if not declared:
+            return ""
+
+        from tools.condition_gate import syntax_check_file
+        errors = []
+        for script in dict.fromkeys(declared):
+            ap = script if os.path.isabs(script) else os.path.join(project_path, script)
+            if not os.path.exists(ap):
+                errors.append(f"声明的检测脚本不存在：{script}")
+                continue
+            syn = syntax_check_file(ap)
+            if not syn.get("ok"):
+                errors.append(f"检测脚本语法未通过（不得带病交接）：{script} :: {syn.get('error', '')}")
+                continue
+            try:
+                proc = subprocess.run(
+                    f"{sys.executable} {ap}", shell=True, cwd=project_path,
+                    timeout=120, capture_output=True, text=True
+                )
+                if proc.returncode != 0:
+                    evidence = (proc.stdout or proc.stderr or "").strip()[:400]
+                    errors.append(f"检测脚本运行未通过（exit={proc.returncode}）：{script} :: {evidence}")
+            except subprocess.TimeoutExpired:
+                errors.append(f"检测脚本运行超时：{script}")
+        return "\n".join(errors)
+
     def _run_single_fix_pipeline(
         self,
         target_file: str,
@@ -1059,7 +1109,10 @@ class ConcurrentModularPipeline:
                 f"{analysis_excerpt}\n\n"
                 f"请仔细阅读 `{target_file}` 的完整代码（调用 read 工具），"
                 f"根据分析师报告中与此文件相关的问题，进行精准的最小化修复（不要过度重构，只修复已识别的问题）。\n"
-                f"若任务涉及外部 3D 资产，必须调用 vendor_assets 工具（download_url + dest_path）将 .glb 资产真实落地到项目 models/ 目录。\n"
+                f"若任务涉及外部 3D 资产，必须调用 vendor_assets 工具（download_url + dest_path）将 .glb 资产真实落地到项目 models/ 目录，"
+                f"且资产文件必须使用语义化命名（如 flamingo.glb、lantern.glb），严禁 asset_1.glb 之类的数字/无意义命名。\n"
+                f"若你编写了临时检测脚本（如资产引用校验脚本），必须在报告首部声明一行：CHECK_SCRIPT: <相对项目根的脚本路径>；"
+                f"脚本会在验收门禁被强制语法检测并运行，exit 0 才放行。\n"
                 f"修复完成后必须真实修改 `{target_file}` 的源码内容（只写报告不改代码将判定为失败并触发返工），然后将改动说明写入：{coder_out}"
             )
             if last_error:
@@ -1077,6 +1130,12 @@ class ConcurrentModularPipeline:
                     f"Coder 未实际修改目标文件 `{target_file}`（内容签名未变化），"
                     f"仅输出报告属于无效交付。请调用 write/edit 工具真正修改源码后重试！"
                 )
+                continue
+
+            # Hard gate: declared temp CHECK_SCRIPTs must be syntax-valid AND run clean
+            check_script_errors = self._verify_check_scripts(project_path, coder_out)
+            if check_script_errors:
+                last_error = check_script_errors
                 continue
 
             # Hard gate: machine-checkable conditions (condition_gate)

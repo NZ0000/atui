@@ -78,6 +78,43 @@ def _abs(root: str, path: str) -> str:
     return path if os.path.isabs(path) else os.path.join(root, path)
 
 
+def syntax_check_file(path: str) -> Dict[str, Any]:
+    """Public wrapper: syntax-check a temp check script before hand-over/gating."""
+    return _syntax_check(path)
+
+
+def _syntax_check(path: str) -> Dict[str, Any]:
+    """Syntax-validate a check script. .py via ast.parse; others via language CLI if available."""
+    try:
+        if path.endswith(".py"):
+            import ast
+            with open(path, "r", encoding="utf-8") as f:
+                src = f.read()
+            ast.parse(src)
+            return {"ok": True, "error": ""}
+        if path.endswith((".js", ".mjs", ".cjs")):
+            node = __import__("shutil").which("node")
+            if not node:
+                return {"ok": True, "error": ""}  # no node available, skip js syntax gate
+            proc = subprocess.run(
+                [node, "--check", path], timeout=30, capture_output=True, text=True
+            )
+            if proc.returncode != 0:
+                return {"ok": False, "error": (proc.stderr or proc.stdout).strip()[:400]}
+            return {"ok": True, "error": ""}
+        # Unknown extension: try python parse if content looks like python, else accept
+        with open(path, "r", encoding="utf-8", errors="ignore") as f:
+            head = f.read(400)
+        if "def " in head or "import " in head:
+            import ast
+            ast.parse(open(path, "r", encoding="utf-8").read())
+        return {"ok": True, "error": ""}
+    except SyntaxError as e:
+        return {"ok": False, "error": f"line {getattr(e, 'lineno', '?')}: {e.msg}"}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
 def _check_one(cond: Dict[str, Any], root: str) -> Dict[str, Any]:
     ctype = (cond.get("type") or "").lower().strip()
     res: Dict[str, Any] = {"type": ctype or "unknown", "spec": cond, "passed": False, "detail": ""}
@@ -138,6 +175,12 @@ def _check_one(cond: Dict[str, Any], root: str) -> Dict[str, Any]:
                 ap = _abs(root, script_path)
                 if not os.path.exists(ap):
                     res.update(detail=f"check script '{script_path}' MISSING")
+                    return res
+                # Syntax pre-check: a temp check script must be syntactically valid
+                # before it can be handed over and executed as a gate.
+                syn = _syntax_check(ap)
+                if not syn["ok"]:
+                    res.update(detail=f"check script '{script_path}' SYNTAX ERROR: {syn['error']}")
                     return res
                 cmd = f"{sys.executable} {ap} {cond.get('args', '')}".strip()
             else:

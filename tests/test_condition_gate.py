@@ -164,3 +164,27 @@ def test_invalid_conditions_rejected():
         "conditions": [{"type": "unknown_type"}]
     })
     assert res["data"]["passed"] is False
+
+
+def test_script_syntax_precheck_rejects_broken_script():
+    """A temp check script with syntax errors must NEVER run as a gate — reject at hand-over."""
+    with tempfile.TemporaryDirectory() as tmp:
+        broken = os.path.join(tmp, "broken_check.py")
+        with open(broken, "w") as f:
+            f.write("def broken(:\n    pass\n")  # invalid python syntax
+        res = tools.execute_tool("condition_gate", {
+            "conditions": [{"type": "script", "path": "broken_check.py"}],
+            "root_dir": tmp
+        })
+        assert res["data"]["passed"] is False
+        assert "SYNTAX ERROR" in res["data"]["failure_summary"]
+
+        # valid script passes syntax and runs
+        good = os.path.join(tmp, "good_check.py")
+        with open(good, "w") as f:
+            f.write("import sys\nsys.exit(0)")
+        res = tools.execute_tool("condition_gate", {
+            "conditions": [{"type": "script", "path": "good_check.py"}],
+            "root_dir": tmp
+        })
+        assert res["data"]["passed"] is True

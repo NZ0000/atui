@@ -36,6 +36,7 @@ gate_rules:
 3. **依赖管理与离线资产落地**：
    - 检查项目缺失的 Python 包（`requirements.txt`）或 Node 依赖，自动化执行安全安装；
    - 针对高频第三方库（如 Three.js 等），调用 `vendor_assets` 工具将资源沉淀在本地，确保断网离线环境下的独立可用。
+   - 【资产命名规范】通过 `vendor_assets` 落地的资产文件（.glb/.gltf/贴图/音频等）必须使用语义化命名（如 `flamingo.glb`、`street-lamp.glb`），名称应体现资产内容；严禁 `asset_1.glb`、`1.glb` 之类的数字/无意义命名，源文件名无语义时必须重命名后落盘。
 
 4. **环境自检与门禁产出**：
    - 必须使用 `write` 工具生成结构化环境部署报告（`deliverables/deployment_report.md`），详述各服务端口、运行状态及健康检测 URL。

@@ -45,6 +45,7 @@ gate_rules:
 
 4. **自测与门禁产出**：
    - 编写完代码后，主动调用相应的测试与校验工具（如 `test_runner`、`web_validator`、`browser_test` 等）进行自测验证。
+   - 若编写了临时检测脚本，必须先用语法检测（如 `python -c "import ast; ast.parse(open('<脚本>').read())"` 或 `node --check`）自检通过后再交接；并在报告中以一行 `CHECK_SCRIPT: <相对项目根的脚本路径>` 显式声明，验收门禁会强制运行该脚本，exit 0 才放行。
    - 必须使用 `write` 工具将所修改的代码清单、实现思路及关键逻辑记录在指定的输出文件中。
 
 5. **技术检索与三维视效工程规范（Web Search & 3D Engineering First Principles）**：
@@ -59,4 +60,5 @@ gate_rules:
        - 严禁曲面呈现生硬的低模切片棱角；加载或创建模型后必须确保材质平滑着色（`material.flatShading = false`），并调用 `geometry.computeVertexNormals()` 重新插值法向量，使曲面受光与高光如丝般平滑。
      - **充沛的多重光照体系 (Multi-Light Hierarchy)**：配置半球漫反射天光 (HemisphereLight) 确保背光面通透不死黑，主平行光投射清晰阴影，逆向轮廓光 (Rim Light) 提拔空间纵深。
      - **外部高精模型支持与容灾 (Resilient External Assets)**：优先通过 `vendor_assets` 工具下载自包含单文件 `.glb` 资产（如 `helmet` 对应 `models/DamagedHelmet.glb`），并在加载成功后立刻隐藏 Loading 遮罩；严禁加载缺失子贴图的残缺 `.gltf`；且必须提供加载失败时的程序化备用降级渲染逻辑。
+     - **资产语义化命名铁律 (Semantic Asset Naming)**：下载或落地的外部资产文件（.glb/.gltf/贴图/音频等）必须使用语义化命名（小写+连字符或下划线，如 `flamingo.glb`、`street-lamp.glb`、`oak-tree.glb`），名称应直观体现资产内容；严禁 `asset_1.glb`、`1.glb`、`model_002.glb` 之类的数字/无意义命名。若源文件名本身无语义，必须先重命名为语义名称再落盘引用。
 
