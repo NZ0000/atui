@@ -354,9 +354,14 @@
     <script type="module">
         import * as THREE from 'three';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 
         // --- Application State ---
         let scene, camera, renderer, controls, clock;
+        let composer, bloomPass;
+        let greebleNormalTex, greebleRoughnessTex;
         let stationGroup, starField, energyStream, debrisBelt;
         let satellites = [];
         let raycaster, mouse;
@@ -410,6 +415,134 @@
             }
         };
 
+
+        // --- High-Fidelity Procedural Greeble Normal Map & Roughness Map Generator ---
+        function createGreebleTextures(size = 1024) {
+            const nCanvas = document.createElement('canvas');
+            nCanvas.width = size;
+            nCanvas.height = size;
+            const nCtx = nCanvas.getContext('2d');
+            nCtx.fillStyle = 'rgb(128, 128, 255)';
+            nCtx.fillRect(0, 0, size, size);
+
+            const rCanvas = document.createElement('canvas');
+            rCanvas.width = size;
+            rCanvas.height = size;
+            const rCtx = rCanvas.getContext('2d');
+            rCtx.fillStyle = 'rgb(45, 45, 45)';
+            rCtx.fillRect(0, 0, size, size);
+
+            const cols = 16;
+            const rows = 16;
+            const tileW = size / cols;
+            const tileH = size / rows;
+
+            for (let c = 0; c < cols; c++) {
+                for (let r = 0; r < rows; r++) {
+                    const x = c * tileW;
+                    const y = r * tileH;
+
+                    const panelRough = Math.floor(35 + Math.random() * 55);
+                    rCtx.fillStyle = 'rgb(' + panelRough + ',' + panelRough + ',' + panelRough + ')';
+                    rCtx.fillRect(x + 2, y + 2, tileW - 4, tileH - 4);
+
+                    const baseH = (c + r) % 2 === 0 ? 142 : 118;
+                    nCtx.fillStyle = 'rgb(' + baseH + ',' + baseH + ',255)';
+                    nCtx.fillRect(x + 2, y + 2, tileW - 4, tileH - 4);
+
+                    nCtx.lineWidth = 3;
+                    nCtx.strokeStyle = 'rgb(105, 215, 255)';
+                    nCtx.beginPath();
+                    nCtx.moveTo(x + 2, y + tileH - 2);
+                    nCtx.lineTo(x + 2, y + 2);
+                    nCtx.lineTo(x + tileW - 2, y + 2);
+                    nCtx.stroke();
+
+                    nCtx.strokeStyle = 'rgb(195, 75, 255)';
+                    nCtx.beginPath();
+                    nCtx.moveTo(x + tileW - 2, y + 2);
+                    nCtx.lineTo(x + tileW - 2, y + tileH - 2);
+                    nCtx.lineTo(x + 2, y + tileH - 2);
+                    nCtx.stroke();
+
+                    if (Math.random() > 0.35) {
+                        const subPad = 7 + Math.floor(Math.random() * 6);
+                        const subW = tileW - subPad * 2;
+                        const subH = tileH - subPad * 2;
+
+                        rCtx.fillStyle = 'rgb(110, 110, 110)';
+                        rCtx.fillRect(x + subPad, y + subPad, subW, subH);
+
+                        nCtx.fillStyle = 'rgb(112, 112, 255)';
+                        nCtx.fillRect(x + subPad, y + subPad, subW, subH);
+
+                        nCtx.strokeStyle = 'rgb(195, 75, 255)';
+                        nCtx.beginPath();
+                        nCtx.moveTo(x + subPad, y + subPad + subH);
+                        nCtx.lineTo(x + subPad, y + subPad);
+                        nCtx.lineTo(x + subPad + subW, y + subPad);
+                        nCtx.stroke();
+
+                        nCtx.strokeStyle = 'rgb(105, 215, 255)';
+                        nCtx.beginPath();
+                        nCtx.moveTo(x + subPad + subW, y + subPad);
+                        nCtx.lineTo(x + subPad + subW, y + subPad + subH);
+                        nCtx.lineTo(x + subPad, y + subPad + subH);
+                        nCtx.stroke();
+
+                        const boltOffsets = [
+                            [subPad + 2, subPad + 2],
+                            [tileW - subPad - 2, subPad + 2],
+                            [subPad + 2, tileH - subPad - 2],
+                            [tileW - subPad - 2, tileH - subPad - 2]
+                        ];
+                        boltOffsets.forEach(([bx, by]) => {
+                            nCtx.fillStyle = 'rgb(90, 200, 255)';
+                            nCtx.beginPath();
+                            nCtx.arc(x + bx, y + by, 2, 0, Math.PI * 2);
+                            nCtx.fill();
+                            rCtx.fillStyle = 'rgb(20, 20, 20)';
+                            rCtx.beginPath();
+                            rCtx.arc(x + bx, y + by, 2, 0, Math.PI * 2);
+                            rCtx.fill();
+                        });
+                    }
+
+                    if (Math.random() > 0.55) {
+                        nCtx.strokeStyle = 'rgb(80, 80, 255)';
+                        nCtx.lineWidth = 2;
+                        for (let k = 5; k < tileH - 6; k += 5) {
+                            nCtx.beginPath();
+                            nCtx.moveTo(x + 5, y + k);
+                            nCtx.lineTo(x + tileW - 5, y + k);
+                            nCtx.stroke();
+                        }
+                    }
+                }
+            }
+
+            nCtx.strokeStyle = 'rgb(60, 60, 255)';
+            nCtx.lineWidth = 4;
+            rCtx.strokeStyle = 'rgb(200, 200, 200)';
+            rCtx.lineWidth = 4;
+            for (let i = 0; i <= size; i += tileW * 2) {
+                nCtx.beginPath(); nCtx.moveTo(i, 0); nCtx.lineTo(i, size); nCtx.stroke();
+                rCtx.beginPath(); rCtx.moveTo(i, 0); rCtx.lineTo(i, size); rCtx.stroke();
+                nCtx.beginPath(); nCtx.moveTo(0, i); nCtx.lineTo(size, i); nCtx.stroke();
+                rCtx.beginPath(); rCtx.moveTo(0, i); rCtx.lineTo(size, i); rCtx.stroke();
+            }
+
+            const nTex = new THREE.CanvasTexture(nCanvas);
+            nTex.wrapS = THREE.RepeatWrapping;
+            nTex.wrapT = THREE.RepeatWrapping;
+
+            const rTex = new THREE.CanvasTexture(rCanvas);
+            rTex.wrapS = THREE.RepeatWrapping;
+            rTex.wrapT = THREE.RepeatWrapping;
+
+            return { normalMap: nTex, roughnessMap: rTex };
+        }
+
         // --- Initialization ---
         function init() {
             const container = document.getElementById('canvas-container');
@@ -431,6 +564,19 @@
             renderer.toneMapping = THREE.ACESFilmicToneMapping;
             renderer.toneMappingExposure = 1.2;
             container.appendChild(renderer.domElement);
+
+            // Post-processing: Unreal Bloom Pass
+            composer = new EffectComposer(renderer);
+            const renderPass = new RenderPass(scene, camera);
+            composer.addPass(renderPass);
+
+            bloomPass = new UnrealBloomPass(
+                new THREE.Vector2(window.innerWidth, window.innerHeight),
+                1.35, // strength
+                0.42, // radius
+                0.82  // threshold
+            );
+            composer.addPass(bloomPass);
 
             // 4. Controls
             controls = new OrbitControls(camera, renderer.domElement);
@@ -523,6 +669,7 @@
         function toggleLightingMode() {
             alternateLighting = !alternateLighting;
             if (alternateLighting) {
+                if (bloomPass) bloomPass.strength = 2.4;
                 dirLight.intensity = 5.0;
                 ambientLight.color.setHex(0x3b82f6);
                 ambientLight.intensity = 2.5;
@@ -531,6 +678,7 @@
                 document.getElementById('btn-toggle-lights').style.borderColor = '#38bdf8';
                 document.getElementById('btn-toggle-lights').style.color = '#38bdf8';
             } else {
+                if (bloomPass) bloomPass.strength = 1.35;
                 dirLight.intensity = 3.0;
                 ambientLight.color.setHex(0x1e293b);
                 ambientLight.intensity = 1.5;
@@ -620,31 +768,52 @@
             stationGroup = new THREE.Group();
             scene.add(stationGroup);
 
-            // Shared PBR Materials
+            // Generate Procedural Greeble Normal & Roughness Maps
+            const textures = createGreebleTextures(1024);
+            greebleNormalTex = textures.normalMap;
+            greebleRoughnessTex = textures.roughnessMap;
+            greebleNormalTex.repeat.set(4, 4);
+            greebleRoughnessTex.repeat.set(4, 4);
+
+            // Shared PBR Materials with Sci-Fi Greeble Surface Detail
             const matDarkMetal = new THREE.MeshStandardMaterial({
                 color: 0x1e293b,
-                metalness: 0.85,
-                roughness: 0.25
+                metalness: 0.88,
+                roughness: 0.28,
+                normalMap: greebleNormalTex,
+                normalScale: new THREE.Vector2(1.6, 1.6),
+                roughnessMap: greebleRoughnessTex
             });
 
             const matLightAlloy = new THREE.MeshStandardMaterial({
                 color: 0xcbd5e1,
-                metalness: 0.9,
-                roughness: 0.15
+                metalness: 0.92,
+                roughness: 0.2,
+                normalMap: greebleNormalTex,
+                normalScale: new THREE.Vector2(1.4, 1.4),
+                roughnessMap: greebleRoughnessTex
             });
 
             const matGoldFoil = new THREE.MeshStandardMaterial({
                 color: 0xf59e0b,
                 metalness: 0.95,
-                roughness: 0.3
+                roughness: 0.35,
+                normalMap: greebleNormalTex,
+                normalScale: new THREE.Vector2(0.9, 0.9)
             });
 
-            const matNeonCyan = new THREE.MeshBasicMaterial({
-                color: 0x06b6d4
+            const matNeonCyan = new THREE.MeshStandardMaterial({
+                color: 0x06b6d4,
+                emissive: 0x06b6d4,
+                emissiveIntensity: 4.5,
+                roughness: 0.2
             });
 
-            const matNeonPink = new THREE.MeshBasicMaterial({
-                color: 0xec4899
+            const matNeonPink = new THREE.MeshStandardMaterial({
+                color: 0xec4899,
+                emissive: 0xec4899,
+                emissiveIntensity: 4.2,
+                roughness: 0.2
             });
 
             // Helper function to mark interactive objects
@@ -702,6 +871,27 @@
                 ribMesh.rotation.x = Math.PI / 2;
                 ribMesh.position.y = i;
                 coreGroup.add(ribMesh);
+            }
+            // 4 Spiral High-Voltage Energy Conduits wrapping around the core
+            for (let i = 0; i < 4; i++) {
+                const angleOffset = (i * Math.PI) / 2;
+                const points = [];
+                for (let t = -16; t <= 16; t += 1) {
+                    const angle = t * 0.35 + angleOffset;
+                    const r = 4.6;
+                    points.push(new THREE.Vector3(Math.cos(angle) * r, t, Math.sin(angle) * r));
+                }
+                const curve = new THREE.CatmullRomCurve3(points);
+                const tubeGeom = new THREE.TubeGeometry(curve, 64, 0.16, 8, false);
+                const tubeMat = new THREE.MeshStandardMaterial({
+                    color: 0x38bdf8,
+                    emissive: 0x06b6d4,
+                    emissiveIntensity: 3.5,
+                    metalness: 0.8,
+                    roughness: 0.2
+                });
+                const tubeMesh = new THREE.Mesh(tubeGeom, tubeMat);
+                coreGroup.add(tubeMesh);
             }
 
             stationGroup.add(coreGroup);
@@ -966,6 +1156,12 @@
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
+            if (composer) {
+                composer.setSize(window.innerWidth, window.innerHeight);
+            }
+            if (bloomPass) {
+                bloomPass.resolution.set(window.innerWidth, window.innerHeight);
+            }
         }
 
         // --- Reset Camera ---
@@ -1047,7 +1243,11 @@
 
             // 7. Update controls & render
             controls.update();
-            renderer.render(scene, camera);
+            if (composer) {
+                composer.render();
+            } else {
+                renderer.render(scene, camera);
+            }
         }
 
         // Run Init

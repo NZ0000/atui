@@ -38,7 +38,8 @@ from api.service import (
     execute_tool_api,
     run_tools_batch,
     validate_web_code,
-    test_browser_page
+    test_browser_page,
+    search_web_info
 )
 from ui.terminal import run_interactive_session, render_markdown, format_event_for_human
 
@@ -49,6 +50,7 @@ run_tool = execute_tool_api
 run_batch = run_tools_batch
 validate_web = validate_web_code
 test_browser = test_browser_page
+search_web = search_web_info
 
 def _format_event_printer(event: Event):
     """Console printer for CLI feedback."""

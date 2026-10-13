@@ -75,6 +75,16 @@ class TestWebAndBatchTools(unittest.TestCase):
         abs_p = "/tmp/test.txt"
         self.assertEqual(resolve_project_path(abs_p), abs_p)
 
+    def test_web_search_tool(self):
+        from tools.web_search import search_internet
+        # Test with empty query
+        res_empty = search_internet("")
+        self.assertFalse(res_empty["success"])
+
+        # Test with mock fetch url
+        res_fetch = search_internet("anything", fetch_url="data:text/html,<h1>Hello Test</h1>")
+        self.assertTrue(res_fetch["success"])
+
 if __name__ == "__main__":
     unittest.main()
 

@@ -81,6 +81,10 @@ def test_browser_page(url_or_path: str, screenshot_path: Optional[str] = None, w
     """Run headless browser test, capture console errors and screenshot."""
     return tools.execute_tool("browser_test", {"url_or_path": url_or_path, "screenshot_path": screenshot_path, "wait_ms": wait_ms})
 
+def search_web_info(query: str, max_results: int = 5, fetch_url: Optional[str] = None) -> Dict[str, Any]:
+    """Search the internet for technical code samples, documentation, and references."""
+    return tools.execute_tool("web_search", {"query": query, "max_results": max_results, "fetch_url": fetch_url})
+
 def subscribe_events(callback: Callable[[Event], None]):
     default_bus.subscribe(callback)
 

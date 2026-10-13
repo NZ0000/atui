@@ -145,7 +145,13 @@ atui_harness/
 │   ├── test_runner.py         # 质量检测：AST语法解析、py_compile、全量测试运行
 │   ├── git_tool.py            # 版本控制：status、diff、commit、log、rollback
 │   ├── inspect_ref.py         # 参考检索：深入搜索 ref/ 模式与架构
-│   └── calc.py                # 自进化产物：四则运算与统计分析新工具
+│   ├── calc.py                # 自进化产物：四则运算与统计分析新工具
+│   ├── web_search.py          # 网络搜索：实时检索前沿实现方案、Three.js技巧与文档
+│   ├── browser_test.py        # 无头浏览器：Chromium CDP 控制台日志、网络监听与视口截图
+│   ├── web_validator.py       # 前端质检：HTML/CSS/JS 语法与闭合性静态分析
+│   ├── batch_run.py           # 批处理执行：单轮合并执行多个工具调用，极省Token
+│   ├── vendor_assets.py       # 离线化引擎：本地离线缓存依赖与模型资产
+│   └── env_manager.py         # 环境与服务管理：系统探针与 HTTP/WS/MQTT 守护进程
 ├── core/                      # Harness 核心引擎与门禁层
 │   ├── project.py             # 统一项目目录管理、工作区切换与规则自动注入
 │   ├── llm.py                 # 零额外依赖 OpenAI 兼容 LLM 客户端

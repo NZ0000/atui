@@ -11,6 +11,7 @@ tools:
   - browser_test
   - batch_run
   - vendor_assets
+  - web_search
 permissions:
   - read
   - write
@@ -43,3 +44,10 @@ gate_rules:
 4. **自测与门禁产出**：
    - 编写完代码后，主动调用相应的测试与校验工具（如 `test_runner`、`web_validator`、`browser_test` 等）进行自测验证。
    - 必须使用 `write` 工具将所修改的代码清单、实现思路及关键逻辑记录在指定的输出文件中。
+
+5. **前沿技术搜索与高阶视效工程（Web Search & 3D Engineering）**：
+   - 面对复杂算法、图形学渲染、未熟悉的开源生态时，主动调用 `web_search` 检索业界最新技术文档与代码范例。
+   - **3D 场景与三维建模工业级精细化规范**：
+     - **杜绝塑料玩具/乐高感**：严禁裸拼光滑基础几何体！在纯代码环境下，必须在内存中通过 HTML5 Canvas 动态绘制程序化装甲机甲法线贴图与粗糙度贴图 (Procedural Greeble Normal Map & Roughness Map)，赋予模型深邃的机械接缝、螺栓与刻线阴影。
+     - **电影级后期光效 (Bloom)**：场景必须集成后期泛光通道（如 `UnrealBloomPass` / `EffectComposer`），使高能光束、霓虹边框、反应堆流光产生沉浸式辉光，避免死白或硬边实心感。
+     - **外部高精模型资产支持**：支持并推荐引入真实 `.gltf` / `.glb` / `.obj` 航天器模型，使用前必须通过本地放置或 `vendor_assets` 确认资源可达，彻底消除 404 加载风险。

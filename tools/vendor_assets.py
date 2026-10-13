@@ -38,7 +38,17 @@ TOOL_SPEC = {
 
 THREE_FILES = {
     "three.module.js": "https://unpkg.com/three@0.160.0/build/three.module.js",
-    "addons/controls/OrbitControls.js": "https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js"
+    "addons/controls/OrbitControls.js": "https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js",
+    "addons/postprocessing/EffectComposer.js": "https://unpkg.com/three@0.160.0/examples/jsm/postprocessing/EffectComposer.js",
+    "addons/postprocessing/RenderPass.js": "https://unpkg.com/three@0.160.0/examples/jsm/postprocessing/RenderPass.js",
+    "addons/postprocessing/ShaderPass.js": "https://unpkg.com/three@0.160.0/examples/jsm/postprocessing/ShaderPass.js",
+    "addons/postprocessing/UnrealBloomPass.js": "https://unpkg.com/three@0.160.0/examples/jsm/postprocessing/UnrealBloomPass.js",
+    "addons/postprocessing/Pass.js": "https://unpkg.com/three@0.160.0/examples/jsm/postprocessing/Pass.js",
+    "addons/postprocessing/MaskPass.js": "https://unpkg.com/three@0.160.0/examples/jsm/postprocessing/MaskPass.js",
+    "addons/shaders/CopyShader.js": "https://unpkg.com/three@0.160.0/examples/jsm/shaders/CopyShader.js",
+    "addons/shaders/LuminosityHighPassShader.js": "https://unpkg.com/three@0.160.0/examples/jsm/shaders/LuminosityHighPassShader.js",
+    "addons/loaders/GLTFLoader.js": "https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js",
+    "addons/loaders/OBJLoader.js": "https://unpkg.com/three@0.160.0/examples/jsm/loaders/OBJLoader.js"
 }
 
 def vendor_three(dest_dir: str) -> Dict[str, Any]:
