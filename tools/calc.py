@@ -7,7 +7,14 @@ Follows the standard plugin interface and CLI runner contract.
 import statistics
 import json
 from typing import Any, Dict, List, Union
-from tools.base import make_result, cli_runner
+import os
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+try:
+    from tools.base import make_result, cli_runner
+except ImportError:
+    from base import make_result, cli_runner
 
 TOOL_SPEC = {
     "name": "calc",
