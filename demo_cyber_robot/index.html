@@ -253,6 +253,10 @@
         let autoRotate = true;
         let turntableAngle = 0;
         let platformGroup;
+        let frameCount = 0;
+        let fpsValue = 60;
+        let fpsElem = document.getElementById('fps');
+        let lastTime = performance.now();
 
         const loaderStatus = document.getElementById('loader-status');
         const loaderElem = document.getElementById('loader');
@@ -269,7 +273,7 @@
 
             // 2. Camera Setup
             camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
-            camera.position.set(0.0, 2.5, 4.5);
+            camera.position.set(0.0, 2.0, 5.8);
 
             // 3. Renderer Setup
             renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -287,7 +291,7 @@
 
             // 5. OrbitControls
             controls = new OrbitControls(camera, renderer.domElement);
-            controls.target.set(0, 1.0, 0);
+            controls.target.set(0, 1.25, 0);
             controls.enableDamping = true;
             controls.dampingFactor = 0.05;
             controls.maxPolarAngle = Math.PI / 2 - 0.02; // Don't go below ground
@@ -479,10 +483,7 @@
                     }
 
                     loaderStatus.textContent = 'Cyber Environment Online';
-                    setTimeout(() => {
-                        loaderElem.style.opacity = '0';
-                        setTimeout(() => loaderElem.style.display = 'none', 600);
-                    }, 500);
+                    loaderElem.style.display = 'none';
                 },
                 function (xhr) {
                     if (xhr.total) {
@@ -526,11 +527,6 @@
         }
 
         // FPS calculation
-        let frameCount = 0;
-        let fpsValue = 60;
-        let fpsElem = document.getElementById('fps');
-        let lastTime = performance.now();
-
         function updateFPS() {
             const now = performance.now();
             frameCount++;
