@@ -72,7 +72,7 @@ THREE_FILES = {
 MODEL_PRESETS = {
     "car": ("https://cdn.jsdelivr.net/gh/mrdoob/three.js@r160/examples/models/gltf/ferrari.glb", "models/ferrari.glb"),
     "ferrari": ("https://cdn.jsdelivr.net/gh/mrdoob/three.js@r160/examples/models/gltf/ferrari.glb", "models/ferrari.glb"),
-    "helmet": ("https://cdn.jsdelivr.net/gh/mrdoob/three.js@r160/examples/models/gltf/DamagedHelmet/glTF/DamagedHelmet.gltf", "models/DamagedHelmet.gltf"),
+    "helmet": ("https://cdn.jsdelivr.net/gh/KhronosGroup/glTF-Sample-Models@master/2.0/DamagedHelmet/glTF-Binary/DamagedHelmet.glb", "models/DamagedHelmet.glb"),
     "robot": ("https://cdn.jsdelivr.net/gh/mrdoob/three.js@r160/examples/models/gltf/RobotExpressive/RobotExpressive.glb", "models/RobotExpressive.glb")
 }
 
