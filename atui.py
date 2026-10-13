@@ -33,6 +33,7 @@ import tools
 from api.service import (
     run_single_agent,
     run_pipeline_workflow,
+    run_concurrent_pipeline_workflow,
     list_available_agents,
     list_available_tools,
     execute_tool_api,
@@ -46,6 +47,8 @@ from ui.terminal import run_interactive_session, render_markdown, format_event_f
 # Expose top-level programmatic functions
 run_agent = run_single_agent
 run_pipeline = run_pipeline_workflow
+run_concurrent = run_concurrent_pipeline_workflow
+run_concurrent_pipeline = run_concurrent_pipeline_workflow
 run_tool = execute_tool_api
 run_batch = run_tools_batch
 validate_web = validate_web_code
@@ -130,6 +133,8 @@ def main():
     parser.add_argument("--output", "-o", type=str, default="deliverables/summary.md", help="产出结果文件路径")
     parser.add_argument("--model", "-m", type=str, default=None, help="使用的模型名称（覆盖默认配置）")
     parser.add_argument("--pipeline", "-p", action="store_true", help="启动全生命周期多智能体流水线 (Plan->Code->Test->Git->Delivery)")
+    parser.add_argument("--concurrent", "-M", action="store_true", help="启动分布式并发多智能体模块流水线 (Concurrent Swarm DAG Pipeline)")
+    parser.add_argument("--workers", "-w", type=int, default=4, help="并发 Worker 线程数 (默认 4)")
     parser.add_argument("--list-agents", action="store_true", help="列出所有可用智能体角色")
     parser.add_argument("--list-tools", action="store_true", help="列出所有可用插件工具")
     parser.add_argument("--json", action="store_true", help="输出完整机器可读的原始 JSON 结果")
@@ -175,6 +180,21 @@ def main():
                 print(f"\033[2m📄 最终交付报告: {output_dest}\033[0m")
             else:
                 print(f"\n\033[31m✖ 流水线失败: {res.get('error')}\033[0m")
+        sys.exit(0 if res.get("success") else 1)
+
+    if args.concurrent:
+        if not task_prompt:
+            print("[错误] 启动并发流水线模式必须提供任务提示词 (--task)", file=sys.stderr)
+            sys.exit(1)
+        res = run_concurrent_pipeline(task=task_prompt, output_file=output_dest, model=model_name, max_workers=args.workers)
+        if args.json:
+            print(json.dumps(res, ensure_ascii=False, indent=2))
+        else:
+            if res.get("success"):
+                print(f"\n\033[32m✔ 分布式并发多智能体流水线执行成功 (耗时: {res.get('elapsed_seconds')}s, 模块数: {res.get('module_count')})\033[0m")
+                print(f"\033[2m📄 最终交付报告: {output_dest}\033[0m")
+            else:
+                print(f"\n\033[31m✖ 并发流水线失败: {res.get('error')}\033[0m")
         sys.exit(0 if res.get("success") else 1)
 
     if agent_target and task_prompt:

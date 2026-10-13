@@ -132,3 +132,23 @@ def run_pipeline_workflow(
     finally:
         if event_callback:
             unsubscribe_events(event_callback)
+
+def run_concurrent_pipeline_workflow(
+    task: str,
+    output_file: str = "deliverables/summary.md",
+    model: Optional[str] = None,
+    max_workers: int = 4,
+    event_callback: Optional[Callable[[Event], None]] = None
+) -> Dict[str, Any]:
+    """Execute distributed concurrent modular multi-agent pipeline."""
+    if event_callback:
+        subscribe_events(event_callback)
+
+    try:
+        from core.concurrent_pipeline import ConcurrentModularPipeline
+        pipeline = ConcurrentModularPipeline(model=model, max_workers=max_workers)
+        result = pipeline.run_concurrent_pipeline(task, output_file=output_file, model=model)
+        return result
+    finally:
+        if event_callback:
+            unsubscribe_events(event_callback)
