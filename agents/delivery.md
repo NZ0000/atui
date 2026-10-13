@@ -1,7 +1,7 @@
 ---
 name: delivery
 description: 收尾交付与知识沉淀智能体（整理整个过程经验、坑点、注意事项、使用方法及资产沉淀）
-model: gemini-2.5-flash-lite
+model: gemini-2.5-flash
 tools:
   - read
   - write

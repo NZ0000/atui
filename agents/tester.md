@@ -1,7 +1,7 @@
 ---
 name: tester
 description: 质量保证与测试智能体（执行全语言语法检查、全量测试用例、失败归因与多模态自动化验收）
-model: gemini-2.5-flash-lite
+model: gemini-2.5-flash
 tools:
   - test_runner
   - web_validator

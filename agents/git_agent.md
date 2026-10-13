@@ -1,7 +1,7 @@
 ---
 name: git_agent
 description: 版本控制与安全审计智能体（审查代码变更Diff、核验门禁、提交Git或在异常时执行回退）
-model: gemini-2.5-flash-lite
+model: gemini-2.5-flash
 tools:
   - git_tool
   - test_runner

@@ -1,7 +1,7 @@
 ---
 name: designer
 description: 视觉设计与审美总监智能体（负责设计规范定义、UI/3D审美验收、文生图Prompt策划与多模态视觉把关）
-model: gemini-2.5-flash-lite
+model: gemini-2.5-flash
 tools:
   - read
   - write

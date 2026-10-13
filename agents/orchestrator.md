@@ -1,7 +1,7 @@
 ---
 name: orchestrator
 description: 主调度智能体（协调子agent调度、监督TDD流水线及生命周期管理，支持全语言全项目）
-model: gemini-2.5-flash-lite
+model: gemini-2.5-flash
 tools:
   - read
   - write

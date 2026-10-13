@@ -1,7 +1,7 @@
 ---
 name: devops
 description: 部署运维与环境智能体（负责环境探测、依赖补全、HTTP/WebSocket/MQTT 服务搭建守护与网络基座注入）
-model: gemini-2.5-flash-lite
+model: gemini-2.5-flash
 tools:
   - env_manager
   - vendor_assets

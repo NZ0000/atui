@@ -1,7 +1,7 @@
 ---
 name: coder
 description: 通用工程编码与重构智能体（遵循TDD原则实现代码，覆盖任意语言与项目类型）
-model: gemini-2.5-flash-lite
+model: gemini-2.5-flash
 tools:
   - read
   - write

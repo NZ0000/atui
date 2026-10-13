@@ -1,7 +1,7 @@
 ---
 name: planner
 description: 规划与架构设计智能体（头脑风暴、分解燃尽验收清单、设计功能与TDD测试用例）
-model: gemini-2.5-flash-lite
+model: gemini-2.5-flash
 tools:
   - inspect_ref
   - read
