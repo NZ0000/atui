@@ -49,7 +49,10 @@ class AgentHarness:
         allowed_tools = self.role.tools
         tool_specs = tools.get_tool_specs(allowed_tools)
 
-        system_instruction = self.role.system_prompt
+        from core.project import get_current_project
+        proj = get_current_project()
+
+        system_instruction = self.role.system_prompt + "\n" + proj.format_prompt_injection()
         if output_file:
             system_instruction += (
                 f"\n\n[MANDATORY OUTPUT REQUIREMENT]\n"
@@ -103,6 +106,16 @@ class AgentHarness:
                         fn_args = json.loads(fn_args_raw) if isinstance(fn_args_raw, str) else fn_args_raw
                     except Exception as e:
                         fn_args = {"_raw": fn_args_raw, "_parse_error": str(e)}
+
+                    if isinstance(fn_args, dict):
+                        if "cwd" in fn_args and not fn_args["cwd"]:
+                            fn_args["cwd"] = proj.path
+                        elif "cwd" not in fn_args:
+                            fn_args["cwd"] = proj.path
+
+                        # Resolve relative file paths to active project path
+                        if "path" in fn_args and isinstance(fn_args["path"], str) and not os.path.isabs(fn_args["path"]):
+                            fn_args["path"] = os.path.join(proj.path, fn_args["path"])
 
                     default_bus.publish(
                         EventType.TOOL_CALL,
@@ -181,10 +194,19 @@ class AgentHarness:
         rules = self.role.gate_rules
 
         if rules.get("require_output_file", True) and output_file:
-            if not os.path.exists(output_file):
+            from core.project import get_current_project
+            proj = get_current_project()
+            candidate_paths = [output_file]
+            if not os.path.isabs(output_file):
+                candidate_paths.append(os.path.join(proj.path, output_file))
+
+            found = False
+            for p in candidate_paths:
+                if os.path.exists(p) and os.path.getsize(p) > 0:
+                    found = True
+                    break
+            if not found:
                 return False, f"未检测到指定的产出文件 `{output_file}`。请使用 write 工具创建并写入该文件。"
-            if os.path.getsize(output_file) == 0:
-                return False, f"产出文件 `{output_file}` 内容为空。必须包含有效内容。"
 
         if rules.get("require_diff", False):
             diff_res = tools.execute_tool("git_tool", {"action": "diff"})

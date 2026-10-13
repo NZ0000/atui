@@ -10,6 +10,12 @@ from core.role import Role
 from core.harness import AgentHarness
 from core.pipeline import PipelineOrchestrator
 from core.event_bus import default_bus, Event, EventType
+from core.project import (
+    manage_project,
+    get_current_project,
+    switch_project,
+    ProjectContext
+)
 import tools
 
 def list_available_agents(agents_dir: str = "agents") -> List[Dict[str, Any]]:

@@ -10,7 +10,10 @@ from api.service import (
     subscribe_events,
     unsubscribe_events,
     run_single_agent,
-    run_pipeline_workflow
+    run_pipeline_workflow,
+    manage_project,
+    get_current_project,
+    switch_project
 )
 
 __all__ = [
@@ -21,5 +24,8 @@ __all__ = [
     "subscribe_events",
     "unsubscribe_events",
     "run_single_agent",
-    "run_pipeline_workflow"
+    "run_pipeline_workflow",
+    "manage_project",
+    "get_current_project",
+    "switch_project"
 ]
