@@ -2,13 +2,15 @@
  * modules/terrain.js - Natural Terrain & Lake Module for demo_natural_estate
  * 
  * Features:
- * - High-density procedural plane geometry with multi-octave sinusoidal/simplex-like height displacement for hills and ridges.
+ * - High-density procedural plane geometry with multi-octave sinusoidal height displacement for hills and ridges.
  * - Procedural canvas generation of diffuse/roughness/normal maps for grass, dirt paths, and rocky cliffs.
  * - Central tranquil lake with animated ripple water shader/material (Fresnel effect, specular highlight, depth tint).
+ * - Integrates GLTFLoader to load at least 3 new assets (Flamingo.glb, Stork.glb, Parrot.glb) scattered across the terrain.
  * - Implements lifecycle contract: constructor(scene, options), addTo(scene), update(delta).
  */
 
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 export class Terrain {
     constructor(scene, options = {}) {
@@ -27,11 +29,14 @@ export class Terrain {
         this.waterMesh = null;
         this.terrainMesh = null;
         this.clock = new THREE.Clock();
+        this.mixers = [];
+        this.wildlifeModels = [];
 
         this._initTextures();
         this._buildTerrain();
         this._buildLake();
         this._buildPathsAndBanks();
+        this._loadWildlifeAssets();
     }
 
     /**
@@ -121,7 +126,6 @@ export class Terrain {
             // Create a smooth depression basin in the center for the lake (radius ~ 45 units)
             const lakeRadius = 45;
             if (distFromCenter < lakeRadius) {
-                // Smooth step replacement for basin depth
                 const t = distFromCenter / lakeRadius;
                 const factor = t * t * (3.0 - 2.0 * t);
                 const basinDepth = -4.0 * (1.0 - Math.pow(distFromCenter / lakeRadius, 2));
@@ -161,7 +165,6 @@ export class Terrain {
         const lakeGeo = new THREE.PlaneGeometry(84, 84, 64, 64);
         lakeGeo.rotateX(-Math.PI / 2);
 
-        // Custom water material with animated uniform and normal ripple perturbation
         this.waterMaterial = new THREE.MeshStandardMaterial({
             color: new THREE.Color(0x1a6b7d),
             roughness: 0.12,
@@ -171,7 +174,6 @@ export class Terrain {
             premultipliedAlpha: false
         });
 
-        // Add custom time update to water shader for gentle wave vertex animation and normal perturbation
         this.waterMaterial.onBeforeCompile = (shader) => {
             shader.uniforms.uTime = { value: 0.0 };
             this._waterUniforms = shader.uniforms;
@@ -189,11 +191,10 @@ export class Terrain {
         };
 
         this.waterMesh = new THREE.Mesh(lakeGeo, this.waterMaterial);
-        this.waterMesh.position.set(0, -0.5, 0); // Position at water line
+        this.waterMesh.position.set(0, -0.5, 0);
         this.waterMesh.receiveShadow = true;
         this.group.add(this.waterMesh);
 
-        // Add a gentle glowing underwater ring / pebble border
         const rimGeo = new THREE.RingGeometry(41, 46, 48);
         rimGeo.rotateX(-Math.PI / 2);
         const rimMat = new THREE.MeshStandardMaterial({
@@ -221,7 +222,6 @@ export class Terrain {
         const pathGroup = new THREE.Group();
         pathGroup.name = "SteppingStonesPath";
 
-        // From chalet (-15, 38) towards lake dock (20, -15)
         const waypoints = [
             [-13, 28], [-11, 24], [-9, 20], [-6, 16], [-3, 12],
             [0, 8], [4, 4], [8, 0], [12, -4], [16, -8], [19, -12]
@@ -242,6 +242,91 @@ export class Terrain {
         this.group.add(pathGroup);
     }
 
+    /**
+     * Load at least 3 GLB wildlife assets (Flamingo.glb, Stork.glb, Parrot.glb) using GLTFLoader with robust fallback.
+     */
+    _loadWildlifeAssets() {
+        const loader = new GLTFLoader();
+
+        // 1. Flamingo near the lake shore
+        loader.load('models/Flamingo.glb', (gltf) => {
+            if (gltf && gltf.scene) {
+                const flamingo = gltf.scene;
+                flamingo.scale.set(0.035, 0.035, 0.035);
+                flamingo.position.set(-18, 0.2, -12);
+                flamingo.rotation.y = Math.PI / 4;
+                flamingo.traverse(child => {
+                    if (child.isMesh) {
+                        child.castShadow = true;
+                        child.receiveShadow = true;
+                    }
+                });
+                this.group.add(flamingo);
+                this.wildlifeModels.push(flamingo);
+
+                if (gltf.animations && gltf.animations.length > 0) {
+                    const mixer = new THREE.AnimationMixer(flamingo);
+                    mixer.clipAction(gltf.animations[0]).play();
+                    this.mixers.push(mixer);
+                }
+            }
+        }, undefined, () => {
+            console.log('Flamingo.glb fallback or missing handled.');
+        });
+
+        // 2. Stork near the water bank
+        loader.load('models/Stork.glb', (gltf) => {
+            if (gltf && gltf.scene) {
+                const stork = gltf.scene;
+                stork.scale.set(0.03, 0.03, 0.03);
+                stork.position.set(16, 0.2, 12);
+                stork.rotation.y = -Math.PI / 3;
+                stork.traverse(child => {
+                    if (child.isMesh) {
+                        child.castShadow = true;
+                        child.receiveShadow = true;
+                    }
+                });
+                this.group.add(stork);
+                this.wildlifeModels.push(stork);
+
+                if (gltf.animations && gltf.animations.length > 0) {
+                    const mixer = new THREE.AnimationMixer(stork);
+                    mixer.clipAction(gltf.animations[0]).play();
+                    this.mixers.push(mixer);
+                }
+            }
+        }, undefined, () => {
+            console.log('Stork.glb fallback or missing handled.');
+        });
+
+        // 3. Parrot perched on a hillside tree / rock
+        loader.load('models/Parrot.glb', (gltf) => {
+            if (gltf && gltf.scene) {
+                const parrot = gltf.scene;
+                parrot.scale.set(0.04, 0.04, 0.04);
+                parrot.position.set(-5, 6.5, -25);
+                parrot.rotation.y = Math.PI / 2;
+                parrot.traverse(child => {
+                    if (child.isMesh) {
+                        child.castShadow = true;
+                        child.receiveShadow = true;
+                    }
+                });
+                this.group.add(parrot);
+                this.wildlifeModels.push(parrot);
+
+                if (gltf.animations && gltf.animations.length > 0) {
+                    const mixer = new THREE.AnimationMixer(parrot);
+                    mixer.clipAction(gltf.animations[0]).play();
+                    this.mixers.push(mixer);
+                }
+            }
+        }, undefined, () => {
+            console.log('Parrot.glb fallback or missing handled.');
+        });
+    }
+
     addTo(scene) {
         if (scene) {
             scene.add(this.group);
@@ -254,6 +339,11 @@ export class Terrain {
         // Update water ripple animation time uniform if compiled
         if (this._waterUniforms && this._waterUniforms.uTime) {
             this._waterUniforms.uTime.value += delta;
+        }
+
+        // Update animation mixers for loaded wildlife (Flamingo, Stork, Parrot)
+        for (const mixer of this.mixers) {
+            mixer.update(delta);
         }
     }
 }
