@@ -11,8 +11,12 @@ Features:
    python atui.py --agent <智能体.md> --task <任务提示词> [--project <项目目录>] [--output <结果汇总.md>]
 5. Full Multi-Agent Lifecycle Pipeline CLI:
    python atui.py --pipeline --task <任务提示词> [--project <项目目录>]
-6. Python Function Calling:
-   from atui import run_agent, run_pipeline, run_tool, manage_project, switch_project
+6. Concurrent Modular Pipeline CLI:
+   python atui.py --concurrent --task <任务提示词> [--project <项目目录>]
+7. Iteration Pipeline CLI (existing projects):
+   python atui.py --iterate --task <修复目标> --url http://localhost:8086 [--files modules/buildings.js,modules/vegetation.js]
+8. Python Function Calling:
+   from atui import run_agent, run_pipeline, run_concurrent, run_iteration, browser_interact, run_tool
 """
 
 import sys
@@ -34,6 +38,8 @@ from api.service import (
     run_single_agent,
     run_pipeline_workflow,
     run_concurrent_pipeline_workflow,
+    run_iteration_pipeline_workflow,
+    interact_browser,
     list_available_agents,
     list_available_tools,
     execute_tool_api,
@@ -49,6 +55,8 @@ run_agent = run_single_agent
 run_pipeline = run_pipeline_workflow
 run_concurrent = run_concurrent_pipeline_workflow
 run_concurrent_pipeline = run_concurrent_pipeline_workflow
+run_iteration = run_iteration_pipeline_workflow       # <-- NEW: iterate existing projects
+browser_interact = interact_browser                   # <-- NEW: multi-angle browser control
 run_tool = execute_tool_api
 run_batch = run_tools_batch
 validate_web = validate_web_code
@@ -134,6 +142,9 @@ def main():
     parser.add_argument("--model", "-m", type=str, default=None, help="使用的模型名称（覆盖默认配置）")
     parser.add_argument("--pipeline", "-p", action="store_true", help="启动全生命周期多智能体流水线 (Plan->Code->Test->Git->Delivery)")
     parser.add_argument("--concurrent", "-M", action="store_true", help="启动分布式并发多智能体模块流水线 (Concurrent Swarm DAG Pipeline)")
+    parser.add_argument("--iterate", "-I", action="store_true", help="启动迭代修复流水线（针对已有项目）: Analyst 分析 -> 并发 Coder 修复 -> 审查 -> 多视角截图验收")
+    parser.add_argument("--url", "-u", type=str, default="", help="项目运行 URL（迭代流水线用），例如 http://localhost:8086")
+    parser.add_argument("--files", "-f", type=str, default="", help="要修复的目标文件，逗号分隔，例如 modules/buildings.js,modules/vegetation.js")
     parser.add_argument("--workers", "-w", type=int, default=4, help="并发 Worker 线程数 (默认 4)")
     parser.add_argument("--list-agents", action="store_true", help="列出所有可用智能体角色")
     parser.add_argument("--list-tools", action="store_true", help="列出所有可用插件工具")
@@ -195,6 +206,35 @@ def main():
                 print(f"\033[2m📄 最终交付报告: {output_dest}\033[0m")
             else:
                 print(f"\n\033[31m✖ 并发流水线失败: {res.get('error')}\033[0m")
+        sys.exit(0 if res.get("success") else 1)
+
+    if args.iterate:
+        if not task_prompt:
+            print("[错误] 启动迭代修复流水线必须提供任务提示词 (--task)", file=sys.stderr)
+            sys.exit(1)
+        target_files_list = [f.strip() for f in args.files.split(",") if f.strip()] if args.files else None
+        print(f"\n\033[1;35m[*] 启动迭代修复流水线...\033[0m")
+        if args.url:
+            print(f"    项目 URL: {args.url}")
+        if target_files_list:
+            print(f"    目标文件: {', '.join(target_files_list)}")
+        res = run_iteration(
+            task=task_prompt,
+            project_url=args.url,
+            target_files=target_files_list,
+            output_file=output_dest or "deliverables/iteration_summary.md",
+            model=model_name,
+            max_workers=args.workers
+        )
+        if args.json:
+            print(json.dumps(res, ensure_ascii=False, indent=2))
+        else:
+            if res.get("success"):
+                print(f"\n\033[32m✔ 迭代修复完成 (耗时: {res.get('elapsed_seconds')}s)\033[0m")
+                print(f"    已修复文件: {res.get('fixed_files')}")
+                print(f"\033[2m📄 交付报告: {res.get('output_file')}\033[0m")
+            else:
+                print(f"\n\033[31m✖ 迭代修复失败，未修复文件: {res.get('failed_files')}\033[0m")
         sys.exit(0 if res.get("success") else 1)
 
     if agent_target and task_prompt:

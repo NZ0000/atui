@@ -78,9 +78,10 @@ Python 是全球 AI、数据科学、自动化与工程运维领域无可争议�
 系统内置完备的八大角色智能体，协同完成复杂软件工程闭环：
 - 🌐 **部署运维与环境工程师 (DevOps)**：负责环境基线探针、依赖包自动化安装、网络通信底座（HTTP 静态伺服、WebSocket、MQTT）搭建与端口守护，彻底消除本地 `file:///` CORS 跨域痛点。
 - 🧭 **规划与架构师 (Planner)**：头脑风暴、分析参考代码模式、先期设计编写 TDD 测试用例，并**强制分解原子化燃尽验收清单 (`acceptance_criteria.md`)**。
+- 🔍 **代码分析师 (Analyst)**：专门深度阅读现有代码、静态推演与依赖拓扑分析、调用无头浏览器与交互截屏定位运行时/视觉缺陷，产出结构化重构方案与缺陷清单，严禁越界写代码。
 - 💻 **全栈编码与重构工程师 (Coder)**：遵循测试用例与项目规则，执行最小化高内聚编码，消除红灯。
-- 🧪 **全栈质量测试专家 (Tester)**：执行 Python AST / `py_compile` / `pytest` / `unittest`、Web 语法校验 (`web_validator`)、无头 Chromium 控制台报错拦截与测试诊断。
-- 🎨 **视觉设计与审美总监 (Designer)**：负责设计规范定义、文生图素材策划、调用无头浏览器截屏并依托多模态视觉感知进行审美审查打勾，坚决杜绝死黑与辣眼睛界面。
+- 🧪 **全栈质量测试专家 (Tester)**：执行 Python AST / `py_compile` / `pytest` / `unittest`、Web 语法校验 (`web_validator`)、无头 Chromium 控制台报错拦截、浏览器多步骤交互测试与测试诊断。
+- 🎨 **视觉设计与审美总监 (Designer)**：负责设计规范定义、文生图素材策划、调用无头浏览器交互截屏（`browser_interact` 多视角切换）并依托多模态视觉感知进行审美审查打勾，坚决杜绝死黑与辣眼睛界面。
 - 🌿 **版本控制与安全审计 (Git Agent)**：审计代码 Diff，通过 TDD 门禁后执行原子化 Commit；若出现破坏性变更或测试未过，果断触发 **Git Rollback 自动回退**。
 - 📦 **收尾交付与知识沉淀 (Delivery)**：复盘全流程，梳理核心经验、踩坑要点（Gotchas）、使用指南并沉淀归档交付资产。
 - 🧠 **主调度大脑 (Orchestrator)**：统筹上述各子角色流转、自修复循环与燃尽门禁协调。
@@ -101,6 +102,7 @@ Python 是全球 AI、数据科学、自动化与工程运维领域无可争议�
   - `batch_run`：支持单轮次批量提交执行多个工具调用，大幅缩减交互轮次与延迟。
   - `web_validator`：HTML5 标签树闭合、CSS 语法与 Node.js V8 级 JavaScript 语法深度检测。
   - `browser_test`：无头 Chromium 运行、WebGL 软光栅化渲染、控制台报错实时捕获与视口截图。
+  - `browser_interact`：交互式浏览器自动化操作（点击按钮、等待时延、执行 JS、多视角截图与桌面级/3D交互测试）。
   - `env_manager`：环境系统探针、本地 HTTP / WebSocket / MQTT 背景服务编排与守护。
   - `vendor_assets`：离线前端依赖本地落地与管理，杜绝外部 CDN 单点断流。
 - **双模调用**：每个工具既可以被 Python 作为函数导入调用 (`execute(params)`)，也可以直接在终端通过 CLI 命令参数调用。
@@ -131,8 +133,11 @@ atui_harness/
 │   └── config.json            # 多大模型接口、API Key、Base URL 及 Harness 策略配置
 ├── agents/                    # 角色驱动配置（Markdown 格式，定义工具、权限、门禁、提示词）
 │   ├── planner.md             # 规划与架构师智能体
+│   ├── analyst.md             # 代码分析师智能体（只读代码+截屏诊断，输出缺陷清单与重构方案）
 │   ├── coder.md               # 编码实现智能体
 │   ├── tester.md              # 质量测试智能体
+│   ├── designer.md            # 视觉审美与交互设计总监
+│   ├── reviewer.md            # 代码审查与心智推演智能体
 │   ├── orchestrator.md        # 主调度循环智能体
 │   ├── git_agent.md           # Git版本控制智能体
 │   └── delivery.md            # 收尾交付智能体
@@ -148,6 +153,7 @@ atui_harness/
 │   ├── calc.py                # 自进化产物：四则运算与统计分析新工具
 │   ├── web_search.py          # 网络搜索：实时检索前沿实现方案、Three.js技巧与文档
 │   ├── browser_test.py        # 无头浏览器：Chromium CDP 控制台日志、网络监听与视口截图
+│   ├── browser_interact.py    # 交互浏览器：按钮点击、多步骤交互、多视角截屏
 │   ├── web_validator.py       # 前端质检：HTML/CSS/JS 语法与闭合性静态分析
 │   ├── batch_run.py           # 批处理执行：单轮合并执行多个工具调用，极省Token
 │   ├── vendor_assets.py       # 离线化引擎：本地离线缓存依赖与模型资产
@@ -159,6 +165,7 @@ atui_harness/
 │   ├── harness.py             # 单智能体执行循环与产出门禁（Rule 8）
 │   ├── tdd_gate.py            # TDD 质量门禁与 Git 自动合并/回退控制器
 │   ├── pipeline.py            # 全流程多智能体流水线编排器
+│   ├── concurrent_pipeline.py # 并发Swarm管线与现有项目增量迭代管线
 │   └── event_bus.py           # 结构化事件总线（供 CLI 与多端 UI 订阅）
 ├── ui/                        # 交互终端 UI 层
 │   ├── __init__.py

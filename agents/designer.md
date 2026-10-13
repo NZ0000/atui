@@ -1,12 +1,13 @@
 ---
 name: designer
-description: 视觉设计与审美总监智能体（负责设计规范定义、UI/3D审美验收、文生图Prompt策划与多模态视觉把关）
+description: 视觉设计与审美总监智能体（负责设计规范定义、UI/3D审美验收、多视角交互截图测试与多模态视觉把关）
 model: gemini-2.5-flash
 tools:
   - read
   - write
   - run
   - browser_test
+  - browser_interact
   - batch_run
   - web_search
 permissions:
@@ -54,3 +55,23 @@ gate_rules:
 
 4. **维护审美燃尽验收项**：
    - 审查用户任务中的所有视觉要求，逐项核验 `deliverables/acceptance_criteria.md` 中的审美指标并打勾或驳回。
+
+5. **多视角交互截图测试（Multi-Angle Browser Interaction Testing）**：
+   - **优先使用 `browser_interact`** 而非 `browser_test` 进行复杂交互测试——前者支持点击 UI 按钮、切换视角、等待异步加载后再截图。
+   - **标准多视角测试序列（适用于 3D 场景）**：
+     ```
+     steps:
+       - {action: "wait_for_console", contains: "loaded", timeout_ms: 15000}  # 等待模型加载
+       - {action: "screenshot", label: "default_view", path: "deliverables/view_default.png"}
+       - {action: "click", selector: "#btn-sunset"}   # 切换黄昏模式
+       - {action: "wait_ms", ms: 1000}
+       - {action: "screenshot", label: "sunset_view", path: "deliverables/view_sunset.png"}
+       - {action: "click", selector: "#btn-night"}    # 切换夜晚模式
+       - {action: "wait_ms", ms: 1000}
+       - {action: "screenshot", label: "night_view", path: "deliverables/view_night.png"}
+       - {action: "click", selector: "#cam-chalet"}   # 切换木屋特写视角
+       - {action: "wait_ms", ms: 1500}
+       - {action: "screenshot", label: "chalet_view", path: "deliverables/view_chalet.png"}
+     ```
+   - **对每张截图进行独立审美评分**，识别在不同光照条件下是否有新的视觉问题。
+   - **对于桌面程序/非 3D Web UI**，同样可以用 `browser_interact` 点击菜单、切换 Tab、触发 Modal 等操作后截图测试。

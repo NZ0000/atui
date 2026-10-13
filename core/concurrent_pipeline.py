@@ -7,8 +7,15 @@ Implements a Hierarchical Concurrent DAG Pipeline:
 2. Concurrent Worker Swarm: Spawns parallel worker pipelines (Coder -> Reviewer -> Tester)
    running concurrently via ThreadPoolExecutor. Supports isolated self-repair loops per module.
 3. Integration Assembly: Master Coder composes all verified modules into master entry (index.html / main.js).
-4. Integration Gates: Master Reviewer + Master Tester + Multimodal Designer (browser_test) end-to-end audit.
+4. Integration Gates: Master Reviewer + Master Tester + Multimodal Designer (browser_interact multi-angle) end-to-end audit.
 5. Delivery: Acceptance criteria reconciliation & Git delivery.
+
+Iteration Pipeline (run_iteration_pipeline):
+  For improving EXISTING projects. Adds a pre-pass Analyst Agent that:
+  - Reads all source files
+  - Captures browser multi-angle screenshots via browser_interact
+  - Identifies issues in code and visuals
+  Then feeds the analysis into concurrent Coder agents for targeted fixes.
 """
 
 import os
@@ -488,5 +495,300 @@ class ConcurrentModularPipeline:
             "success": passed,
             "loops": loop,
             "file": target_file,
+            "error": last_error if not passed else ""
+        }
+
+    # ==================================================================
+    # ITERATION PIPELINE
+    # For improving / debugging EXISTING projects.
+    # Flow: Analyst -> Concurrent Fix Coders -> Reviewer -> Designer
+    # ==================================================================
+
+    def run_iteration_pipeline(
+        self,
+        task: str,
+        project_url: str = "",
+        target_files: Optional[List[str]] = None,
+        output_file: str = "deliverables/iteration_summary.md",
+        model: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Iteration pipeline for improving an existing project.
+
+        Args:
+            task: Description of what needs to be improved/fixed.
+            project_url: Running URL to load in browser (e.g. http://localhost:8086).
+            target_files: Specific files to focus on (e.g. ["modules/buildings.js", "modules/vegetation.js"]).
+                         If None, analyst will discover relevant files automatically.
+            output_file: Path for the final summary report.
+            model: LLM model override.
+
+        Pipeline stages:
+          Phase 0  - Analyst: Read all source code + multi-angle browser screenshots -> analysis report
+          Phase 1  - Concurrent Fix Coders: Each coder gets analyst report + one target file to fix
+          Phase 2  - Integration Reviewer: Diff check on all changes
+          Phase 3  - Designer Visual Audit: browser_interact multi-angle screenshots
+          Phase 4  - Git commit & summary report
+        """
+        active_model = model or self.model
+        start_time = time.time()
+        proj = get_current_project()
+        stage_records = []
+
+        default_bus.publish(EventType.PIPELINE_STEP, {
+            "stage": "iteration_pipeline_start",
+            "task": task,
+            "project_url": project_url,
+            "target_files": target_files
+        })
+
+        # ------------------------------------------------------------------
+        # Phase 0: Analyst – Code Reading + Browser Multi-Angle Screenshots
+        # ------------------------------------------------------------------
+        default_bus.publish(EventType.PIPELINE_STEP, {"stage": "analyst_pre_pass", "role": "analyst"})
+        analyst_role = Role.from_file(self._get_agent_path("analyst"))
+        analyst_harness = AgentHarness(analyst_role, model=active_model)
+        analyst_out = "deliverables/iteration_analysis.md"
+
+        files_hint = ""
+        if target_files:
+            files_hint = f"\n重点分析以下文件：{', '.join(target_files)}"
+
+        browser_hint = ""
+        if project_url:
+            browser_hint = (
+                f"\n请调用 browser_interact 工具，传入 url={project_url}，"
+                f"wait_for_load_ms=12000，并配置以下 steps 序列截取多视角截图：\n"
+                f"  1. wait_for_console（等待模型加载完成日志，contains='loaded'，timeout_ms=15000）\n"
+                f"  2. screenshot（default_view，path=deliverables/iter_view_default.png）\n"
+                f"  3. 若页面有昼夜切换按钮（#btn-sunset）：click → wait_ms(1000) → screenshot(iter_view_sunset.png)\n"
+                f"  4. 若有视角切换按钮（如 #cam-chalet）：click → wait_ms(1500) → screenshot(iter_view_chalet.png)\n"
+                f"对每张截图中的视觉问题进行精确描述（浮动元素、遮挡、锯齿、比例、光照等）。\n"
+            )
+
+        analyst_task = (
+            f"【代码迭代分析任务】\n"
+            f"任务改进目标：{task}\n"
+            f"项目路径：{proj.path}{files_hint}\n"
+            f"{browser_hint}\n"
+            f"请完整阅读项目的全部核心源代码文件（index.js、index.html、modules/ 目录下所有 .js 文件），"
+            f"结合浏览器多视角截图分析，精确识别需要修复的代码问题，输出结构化分析报告至：{analyst_out}\n"
+            f"报告必须包含：问题清单（文件+行号+问题描述）、每张截图的视觉问题描述、修复方向建议（不要直接写代码）。"
+        )
+
+        analyst_res = analyst_harness.run(analyst_task, output_file=analyst_out)
+        stage_records.append({"stage": "analyst", "result": analyst_res})
+
+        # Read analysis report for use by fix coders
+        analysis_content = ""
+        analyst_abs = os.path.join(proj.path, analyst_out)
+        if os.path.exists(analyst_abs):
+            with open(analyst_abs, "r", encoding="utf-8") as f:
+                analysis_content = f.read()
+
+        # ------------------------------------------------------------------
+        # Phase 1: Concurrent Fix Coders (one per target file)
+        # ------------------------------------------------------------------
+        default_bus.publish(EventType.PIPELINE_STEP, {"stage": "concurrent_fix_coders"})
+
+        if not target_files:
+            # Let analyst report guide which files to fix; parse file mentions from report
+            import re
+            mentioned = re.findall(r'`([^`]+\.(?:js|py|html|css|ts))`', analysis_content)
+            # Deduplicate, keep order, limit to 6
+            seen = set()
+            target_files = []
+            for f in mentioned:
+                if f not in seen and not f.startswith("test_"):
+                    seen.add(f)
+                    target_files.append(f)
+                    if len(target_files) >= 6:
+                        break
+            if not target_files:
+                target_files = ["index.js"]  # fallback
+
+        fix_results = {}
+        with concurrent.futures.ThreadPoolExecutor(max_workers=min(self.max_workers, len(target_files))) as executor:
+            future_to_file = {
+                executor.submit(
+                    self._run_single_fix_pipeline,
+                    target_file=f,
+                    task=task,
+                    analysis_content=analysis_content,
+                    project_path=proj.path,
+                    active_model=active_model
+                ): f
+                for f in target_files
+            }
+            for future in concurrent.futures.as_completed(future_to_file):
+                fname = future_to_file[future]
+                try:
+                    res = future.result()
+                    fix_results[fname] = res
+                    default_bus.publish(EventType.PIPELINE_STEP, {
+                        "stage": "fix_worker_done",
+                        "file": fname,
+                        "success": res.get("success", False)
+                    })
+                except Exception as exc:
+                    fix_results[fname] = {"success": False, "error": str(exc)}
+
+        stage_records.append({"stage": "concurrent_fix", "results": fix_results})
+
+        # ------------------------------------------------------------------
+        # Phase 2: Integration Reviewer (diff check)
+        # ------------------------------------------------------------------
+        try:
+            default_bus.publish(EventType.PIPELINE_STEP, {"stage": "iteration_review", "role": "reviewer"})
+            reviewer_role = Role.from_file(self._get_agent_path("reviewer"))
+            rev_harness = AgentHarness(reviewer_role, model=active_model)
+            rev_out = "deliverables/iteration_review.md"
+            rev_task = (
+                f"【迭代修复集成审查】\n"
+                f"本次迭代修复目标：{task}\n"
+                f"调用 code_reviewer / git_tool 提取最新 git diff，逐文件审查修复代码是否正确解决了分析报告中指出的问题，"
+                f"是否引入新的副作用或破坏原有功能。\n"
+                f"对照分析报告（位于 {analyst_out}）中的问题清单逐一核验。\n"
+                f"输出审查结论至：{rev_out}，首行标明【审查结果：PASS】或【审查结果：REJECT 驳回】。"
+            )
+            rev_harness.run(rev_task, output_file=rev_out)
+        except Exception:
+            pass
+
+        # ------------------------------------------------------------------
+        # Phase 3: Designer Visual Audit – Multi-Angle Screenshots
+        # ------------------------------------------------------------------
+        try:
+            default_bus.publish(EventType.PIPELINE_STEP, {"stage": "iteration_visual_audit", "role": "designer"})
+            designer_role = Role.from_file(self._get_agent_path("designer"))
+            designer_harness = AgentHarness(designer_role, model=active_model)
+            design_out = "deliverables/iteration_design_audit.md"
+
+            url_hint = f"页面 URL：{project_url}" if project_url else "使用 browser_test 加载 index.html"
+            design_task = (
+                f"【迭代修复后视觉验收】\n"
+                f"本次迭代目标：{task}\n"
+                f"{url_hint}\n"
+                f"请调用 browser_interact 工具，wait_for_load_ms=12000，执行以下多视角截图序列：\n"
+                f"  步骤1：wait_for_console（等待 'loaded' 日志，timeout_ms=15000）\n"
+                f"  步骤2：screenshot 默认视角 → deliverables/iter_final_default.png\n"
+                f"  步骤3：点击黄昏按钮（#btn-sunset 或文本'夕阳'）→ wait 1000ms → screenshot → iter_final_sunset.png\n"
+                f"  步骤4：点击夜晚按钮（#btn-night 或文本'夜晚'）→ wait 1000ms → screenshot → iter_final_night.png\n"
+                f"  步骤5：点击木屋特写（#cam-chalet）→ wait 1500ms → screenshot → iter_final_chalet.png\n"
+                f"对照迭代分析报告（{analyst_out}）中的原始问题清单，逐项核验每个问题是否已被修复。\n"
+                f"输出多视角审美验收报告至：{design_out}，首行标明【验收结果：PASS】或【验收结果：REJECT 驳回】。"
+            )
+            designer_harness.run(design_task, output_file=design_out)
+        except Exception:
+            pass
+
+        # ------------------------------------------------------------------
+        # Phase 4: Summary & Git Commit
+        # ------------------------------------------------------------------
+        elapsed = round(time.time() - start_time, 2)
+        failed_files = [f for f, r in fix_results.items() if not r.get("success")]
+
+        summary = (
+            f"# 迭代修复交付报告\n\n"
+            f"## 一、迭代目标\n{task}\n\n"
+            f"## 二、执行耗时\n{elapsed} 秒\n\n"
+            f"## 三、修复文件状态\n"
+        )
+        for fname, res in fix_results.items():
+            status = "🟢 成功" if res.get("success") else "🔴 失败"
+            summary += f"- `{fname}`: {status}\n"
+
+        summary += (
+            f"\n## 四、交付产物\n"
+            f"- [分析报告](deliverables/iteration_analysis.md)\n"
+            f"- [代码审查](deliverables/iteration_review.md)\n"
+            f"- [视觉验收](deliverables/iteration_design_audit.md)\n"
+            f"- 多视角截图: iter_view_*.png / iter_final_*.png\n"
+        )
+
+        summary_abs = os.path.join(proj.path, output_file)
+        os.makedirs(os.path.dirname(summary_abs), exist_ok=True)
+        with open(summary_abs, "w", encoding="utf-8") as sf:
+            sf.write(summary)
+
+        git_res = self.tdd_gate.verify_and_git_gate(f"fix(iteration): {task[:60]}")
+
+        return {
+            "success": len(failed_files) == 0,
+            "elapsed_seconds": elapsed,
+            "fixed_files": list(fix_results.keys()),
+            "failed_files": failed_files,
+            "analysis_report": analyst_out,
+            "output_file": output_file,
+            "git_commit": git_res
+        }
+
+    def _run_single_fix_pipeline(
+        self,
+        target_file: str,
+        task: str,
+        analysis_content: str,
+        project_path: str,
+        active_model: str
+    ) -> Dict[str, Any]:
+        """Runs Coder -> Reviewer fix cycle for a single file in iteration mode."""
+        mod_name = os.path.splitext(os.path.basename(target_file))[0]
+        coder_role = Role.from_file(self._get_agent_path("coder"))
+        worker_coder = AgentHarness(coder_role, model=active_model)
+
+        loop = 0
+        passed = False
+        last_error = ""
+
+        # Trim analysis to relevant section for this file to save context
+        analysis_excerpt = analysis_content[:3000]
+
+        while loop < self.max_repair_loops and not passed:
+            loop += 1
+            coder_out = f"deliverables/iteration_fixes/{mod_name}_fix.md"
+            coder_task = (
+                f"【迭代修复任务 - 目标文件: {target_file}】\n\n"
+                f"迭代改进目标：{task}\n\n"
+                f"【分析师报告摘要（含问题清单与修复方向）】\n"
+                f"{analysis_excerpt}\n\n"
+                f"请仔细阅读 `{target_file}` 的完整代码（调用 read 工具），"
+                f"根据分析师报告中与此文件相关的问题，进行精准的最小化修复（不要过度重构，只修复已识别的问题）。\n"
+                f"修复完成后将改动说明写入：{coder_out}"
+            )
+            if last_error:
+                coder_task += f"\n\n上一轮审查驳回原因：{last_error}\n请有针对性地修正！"
+
+            code_res = worker_coder.run(coder_task, output_file=coder_out)
+            if not code_res.get("success"):
+                last_error = code_res.get("error", "Coder failed.")
+                continue
+
+            # Review step
+            try:
+                reviewer_role = Role.from_file(self._get_agent_path("reviewer"))
+                worker_reviewer = AgentHarness(reviewer_role, model=active_model)
+                rev_out = f"deliverables/iteration_fixes/{mod_name}_review.md"
+                rev_task = (
+                    f"审查 `{target_file}` 的迭代修复变更：\n"
+                    f"使用 code_reviewer / git_tool 提取 diff，确认修复是否解决了以下问题：{task}\n"
+                    f"首行标明【审查结果：PASS】或【审查结果：REJECT 驳回】，输出至：{rev_out}"
+                )
+                rev_res = worker_reviewer.run(rev_task, output_file=rev_out)
+                rev_abs = os.path.join(project_path, rev_out)
+                if os.path.exists(rev_abs):
+                    with open(rev_abs, "r", encoding="utf-8") as rf:
+                        r_txt = rf.read()
+                    if "reject" in r_txt.lower() or "驳回" in r_txt:
+                        last_error = f"Reviewer 驳回：{r_txt[:300]}"
+                        continue
+            except Exception:
+                pass
+
+            passed = True
+
+        return {
+            "file": target_file,
+            "success": passed,
+            "loops": loop,
             "error": last_error if not passed else ""
         }

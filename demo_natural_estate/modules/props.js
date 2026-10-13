@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 /**
  * Props module for Lakeside Life & Waterfront Eco-Components
@@ -305,13 +305,13 @@ export class Props {
         this.catModel = catGroup;
         this.propsGroup.add(catGroup);
 
-        // Attempt loading external catv2.glb or fallback gracefully
+        // Attempt loading external catv2.glb
         const loader = new GLTFLoader();
         loader.load('models/catv2.glb', (gltf) => {
             if (gltf && gltf.scene) {
                 this.propsGroup.remove(this.catModel);
                 this.catModel = gltf.scene;
-                this.catModel.scale.set(0.6, 0.6, 0.6);
+                this.catModel.scale.set(0.65, 0.65, 0.65);
                 this.catModel.position.copy(this.catCenter);
                 this.catModel.traverse(child => {
                     if (child.isMesh) {
@@ -329,8 +329,25 @@ export class Props {
                 }
             }
         }, undefined, (err) => {
-            // Graceful fallback to procedural cat if file doesn't exist yet
-            console.log('catv2.glb not found, using procedural stylized cat model.');
+            console.log('catv2.glb fallback active.');
+        });
+
+        // Load swimming duck in the tranquil lake
+        this.duckModel = null;
+        this.duckAngle = 0;
+        loader.load('models/duck.glb', (gltf) => {
+            if (gltf && gltf.scene) {
+                this.duckModel = gltf.scene;
+                this.duckModel.scale.set(0.0035, 0.0035, 0.0035);
+                this.duckModel.position.set(4, 0.05, -8);
+                this.duckModel.traverse(child => {
+                    if (child.isMesh) {
+                        child.castShadow = true;
+                        child.receiveShadow = true;
+                    }
+                });
+                this.propsGroup.add(this.duckModel);
+            }
         });
     }
 
@@ -349,18 +366,26 @@ export class Props {
             light.intensity = 2.3 + Math.sin(Date.now() * 0.012) * 0.3 + (Math.random() - 0.5) * 0.2;
         }
 
-        // Wandering cat movement along a tranquil lakeside path
+        // Cat lounging & wandering on the front lawn
         if (this.catModel) {
-            this.catAngle += this.catWalkSpeed * delta * 0.5;
-            const x = this.catCenter.x + Math.cos(this.catAngle) * this.catRadius;
-            const z = this.catCenter.z + Math.sin(this.catAngle) * (this.catRadius * 0.6);
+            this.catAngle += this.catWalkSpeed * delta * 0.35;
+            const x = this.catCenter.x + Math.cos(this.catAngle) * 5.0;
+            const z = this.catCenter.z + Math.sin(this.catAngle) * 3.5;
             this.catModel.position.x = x;
             this.catModel.position.z = z;
 
-            // Face direction of movement
-            const nextX = this.catCenter.x + Math.cos(this.catAngle + 0.05) * this.catRadius;
-            const nextZ = this.catCenter.z + Math.sin(this.catAngle + 0.05) * (this.catRadius * 0.6);
+            const nextX = this.catCenter.x + Math.cos(this.catAngle + 0.05) * 5.0;
+            const nextZ = this.catCenter.z + Math.sin(this.catAngle + 0.05) * 3.5;
             this.catModel.lookAt(nextX, this.catModel.position.y, nextZ);
+        }
+
+        // Swimming duck on the lake
+        if (this.duckModel) {
+            this.duckAngle += delta * 0.3;
+            this.duckModel.position.x = 6.0 + Math.cos(this.duckAngle) * 6.5;
+            this.duckModel.position.z = -10.0 + Math.sin(this.duckAngle) * 4.5;
+            this.duckModel.position.y = 0.05 + Math.sin(this.duckAngle * 3.0) * 0.04;
+            this.duckModel.rotation.y = -this.duckAngle + Math.PI / 2;
         }
     }
 }

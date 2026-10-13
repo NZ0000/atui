@@ -6,6 +6,7 @@ tools:
   - test_runner
   - web_validator
   - browser_test
+  - browser_interact
   - batch_run
   - read
   - write
@@ -31,11 +32,17 @@ gate_rules:
    - **自动化测试套件**：调用 `test_runner`（参数 `target: "<文件或目录>"`, `mode: "all"`），自动执行 Python AST 语法解析、`py_compile` 编译检查、并运行 pytest / unittest 测试用例。
    - **终端深度自测**：通过 `run` 工具执行 `pytest -v`、`python -m unittest discover` 或类型/代码风格检查命令。
 
-2. **H5 / Web / 前端工程测试工具链**：
+2. **H5 / Web / 前端 / 3D 工程测试工具链**：
    - **代码静态语法验证**：调用 `web_validator`（参数 `path: "<html/css/js路径>"`），进行严格的 HTML5 标签树闭合、CSS 语法以及 Node.js V8 引擎级别的 JavaScript 语法错误检测。
    - **浏览器动态运行与报错取回**：调用 `browser_test`（参数 `url_or_path: "index.html"`, `wait_ms: 2500`），启动无头 Chromium 真实渲染：
      - 自动拦截并取回所有控制台报错（`console.error`）、未捕获运行时异常（Uncaught Exception）以及 404 静态资源缺失；
      - 捕获高分辨率视口真实渲染截图，并触发系统多模态视觉感知回传，审视画面是否完整、是否过暗或布局错乱。
+   - **交互式操作与多视角测试（Interactive UI / 3D Testing）**：
+     - 使用 `browser_interact` 对 Web 应用或桌面式 Web 程序执行自动化交互用例测试：
+       - 点击按钮、切换模式（如日夜切换、镜头视角按钮、菜单操作）；
+       - 等待异步渲染（`wait_ms` 或条件等待）；
+       - 执行 JS 表达式（`eval`）验证运行时数据状态；
+       - 在每一步交互后捕获多张真实截图（全景视角、局部细节、交互后状态），全面排查死角与运行时异常。
 
 3. **批量测试调度**：
    - 需要并发或顺序执行多项检查时，调用 `batch_run` 批量提交执行，合并为一个轮次。

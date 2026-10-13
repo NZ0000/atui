@@ -60,7 +60,7 @@ class NaturalEstateApp {
             0.5,
             1000
         );
-        this.camera.position.set(45, 28, 65);
+        this.camera.position.set(-36, 12, 56);
 
         // Renderer with Hardware 4x MSAA & ACESFilmicToneMapping
         this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -69,7 +69,7 @@ class NaturalEstateApp {
         this.renderer.shadowMap.enabled = true;
         this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        this.renderer.toneMappingExposure = 1.1;
+        this.renderer.toneMappingExposure = 1.15;
         this.container.appendChild(this.renderer.domElement);
 
         // OrbitControls
@@ -79,12 +79,12 @@ class NaturalEstateApp {
         this.controls.maxPolarAngle = Math.PI / 2 - 0.02; // Don't go below ground
         this.controls.minDistance = 5;
         this.controls.maxDistance = 250;
-        this.controls.target.set(0, 2, 0);
+        this.controls.target.set(-4, 4, 12);
     }
 
     _initLighting() {
         // 1. Hemisphere Light (Sky & Ground bounce)
-        this.hemiLight = new THREE.HemisphereLight(0xffffff, 0x445533, 0.7);
+        this.hemiLight = new THREE.HemisphereLight(0xe8f4f8, 0x4d6138, 0.9);
         this.hemiLight.position.set(0, 50, 0);
         this.scene.add(this.hemiLight);
 
@@ -105,7 +105,7 @@ class NaturalEstateApp {
         this.dirLight.shadow.bias = -0.0005;
         this.scene.add(this.dirLight);
 
-        // 3. Environment lighting for metallic reflections
+        // 3. Environment lighting for realistic reflections
         const pmremGenerator = new THREE.PMREMGenerator(this.renderer);
         this.scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
     }
@@ -116,7 +116,7 @@ class NaturalEstateApp {
         this.modules.terrain.addTo(this.scene);
 
         this.modules.buildings = new Buildings(this.scene, {
-            position: new THREE.Vector3(0, 0, 0),
+            position: new THREE.Vector3(-15, 2.5, 38),
             scale: 1.0,
             enableLights: true
         });
@@ -211,13 +211,13 @@ class NaturalEstateApp {
 
         // HUD: Camera Viewpoints
         document.getElementById('cam-overview').addEventListener('click', () => {
-            this._tweenCamera(new THREE.Vector3(45, 28, 65), new THREE.Vector3(0, 2, 0), 1200);
+            this._tweenCamera(new THREE.Vector3(40, 22, 58), new THREE.Vector3(5, 4, 10), 1200);
         });
         document.getElementById('cam-chalet').addEventListener('click', () => {
-            this._tweenCamera(new THREE.Vector3(-2, 4, 14), new THREE.Vector3(0, 3, 0), 1200);
+            this._tweenCamera(new THREE.Vector3(-6, 4.5, 22), new THREE.Vector3(-15, 4.5, 38), 1200);
         });
         document.getElementById('cam-dock').addEventListener('click', () => {
-            this._tweenCamera(new THREE.Vector3(25, 4, -8), new THREE.Vector3(20, 1, -12), 1200);
+            this._tweenCamera(new THREE.Vector3(28, 4.0, -6), new THREE.Vector3(20, 1.0, -14), 1200);
         });
 
         // HUD: Component Visibility Toggles
@@ -269,7 +269,7 @@ class NaturalEstateApp {
         if (this.modules.props) this.modules.props.update(delta);
 
         this.controls.update();
-        this.composer.render();
+        this.renderer.render(this.scene, this.camera);
     }
 }
 

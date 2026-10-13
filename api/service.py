@@ -152,3 +152,61 @@ def run_concurrent_pipeline_workflow(
     finally:
         if event_callback:
             unsubscribe_events(event_callback)
+
+
+def run_iteration_pipeline_workflow(
+    task: str,
+    project_url: str = "",
+    target_files: Optional[list] = None,
+    output_file: str = "deliverables/iteration_summary.md",
+    model: Optional[str] = None,
+    max_workers: int = 4,
+    event_callback: Optional[Callable[[Event], None]] = None
+) -> Dict[str, Any]:
+    """
+    Execute iteration pipeline on an EXISTING project.
+
+    Analyst reads code + captures multi-angle browser screenshots,
+    then concurrent Coders apply targeted fixes, followed by Reviewer
+    and Designer visual audit.
+
+    Args:
+        task: What to improve/fix (e.g. "修复浮动窗口元素，优化植被遮挡问题").
+        project_url: URL of running project (e.g. "http://localhost:8086").
+        target_files: List of files to focus on. If None, Analyst auto-detects.
+        output_file: Path for iteration summary report.
+        model: LLM model override.
+        max_workers: Number of concurrent fix workers.
+    """
+    if event_callback:
+        subscribe_events(event_callback)
+
+    try:
+        from core.concurrent_pipeline import ConcurrentModularPipeline
+        pipeline = ConcurrentModularPipeline(model=model, max_workers=max_workers)
+        result = pipeline.run_iteration_pipeline(
+            task=task,
+            project_url=project_url,
+            target_files=target_files,
+            output_file=output_file,
+            model=model
+        )
+        return result
+    finally:
+        if event_callback:
+            unsubscribe_events(event_callback)
+
+
+def interact_browser(
+    url: str,
+    steps: Optional[list] = None,
+    wait_for_load_ms: int = 3000,
+    screenshot_path: Optional[str] = None
+) -> Dict[str, Any]:
+    """Interact with browser: click elements, take multi-angle screenshots."""
+    return tools.execute_tool("browser_interact", {
+        "url": url,
+        "steps": steps,
+        "wait_for_load_ms": wait_for_load_ms,
+        "screenshot_path": screenshot_path
+    })

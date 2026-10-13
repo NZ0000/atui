@@ -1,5 +1,5 @@
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
-import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 /**
  * 乡村度假木屋与田园庄园建筑组件 (Chalet & Architecture Module)
@@ -77,6 +77,8 @@ export class Buildings {
      */
     initProceduralChaletAndTerrace() {
         const textures = this.createWoodAndStoneTextures();
+        this.proceduralBody = new THREE.Group();
+        this.group.add(this.proceduralBody);
 
         // 1. 石砌基底 (Foundation)
         const foundationGeo = new THREE.BoxGeometry(14, 1.8, 10);
@@ -91,7 +93,7 @@ export class Buildings {
         foundation.position.set(0, 0.9, 0);
         foundation.castShadow = true;
         foundation.receiveShadow = true;
-        this.group.add(foundation);
+        this.proceduralBody.add(foundation);
 
         // 2. 主木屋主体 (Chalet Cabin Body)
         const cabinGeo = new THREE.BoxGeometry(12.8, 5.0, 8.8);
@@ -106,7 +108,7 @@ export class Buildings {
         cabin.position.set(0, 4.3, 0);
         cabin.castShadow = true;
         cabin.receiveShadow = true;
-        this.group.add(cabin);
+        this.proceduralBody.add(cabin);
 
         // 3. 欧式陡峭双坡屋顶 (Roof - Gabled Roof)
         const roofShape = new THREE.Shape();
@@ -134,7 +136,7 @@ export class Buildings {
         roof.position.set(0, 9.1, 0);
         roof.castShadow = true;
         roof.receiveShadow = true;
-        this.group.add(roof);
+        this.proceduralBody.add(roof);
 
         // 4. 石砌烟囱 (Chimney)
         const chimneyGeo = new THREE.BoxGeometry(1.6, 4.5, 1.6);
@@ -146,7 +148,7 @@ export class Buildings {
         const chimney = new THREE.Mesh(chimneyGeo, chimneyMat);
         chimney.position.set(3.8, 9.5, -2.0);
         chimney.castShadow = true;
-        this.group.add(chimney);
+        this.proceduralBody.add(chimney);
 
         // 5. 湖畔木质露台与甲板 (Wooden Terrace & Deck)
         const deckGeo = new THREE.BoxGeometry(16, 0.6, 7);
@@ -184,6 +186,7 @@ export class Buildings {
         this.group.add(fenceGroup);
 
         // 7. 温馨窗户发光与点光源 (Warm Windows & Lights)
+        // NOTE: window planes are placed inside proceduralBody so they hide along with it
         if (this.options.enableLights) {
             const windowGeos = [
                 new THREE.PlaneGeometry(1.5, 2.2),
@@ -196,15 +199,16 @@ export class Buildings {
 
             const win1 = new THREE.Mesh(windowGeos[0], windowMat);
             win1.position.set(-3.0, 4.5, 4.41);
-            this.group.add(win1);
+            // Add to proceduralBody so it hides when cottage.glb loads
+            this.proceduralBody.add(win1);
 
             const win2 = new THREE.Mesh(windowGeos[1], windowMat);
             win2.position.set(3.0, 4.5, 4.41);
-            this.group.add(win2);
+            this.proceduralBody.add(win2);
 
-            // 暖色点光源照亮露台
-            const porchLight = new THREE.PointLight(0xffb74d, 2.5, 18);
-            porchLight.position.set(0, 5.0, 5.5);
+            // 暖色点光源照亮露台 (kept always for ambience, but at lower intensity)
+            const porchLight = new THREE.PointLight(0xffb74d, 1.8, 22);
+            porchLight.position.set(0, 6.5, 4.0);
             porchLight.castShadow = true;
             porchLight.shadow.bias = -0.002;
             this.group.add(porchLight);
@@ -222,18 +226,24 @@ export class Buildings {
             'models/cottage.glb',
             (gltf) => {
                 const model = gltf.scene;
-                model.scale.setScalar(this.options.scale * 2.5);
-                model.position.set(0, 1.8, 0);
+                model.scale.set(11.0, 11.0, 11.0);
+                model.position.set(0, 5.2, 0);
                 model.traverse((child) => {
                     if (child.isMesh) {
                         child.castShadow = true;
                         child.receiveShadow = true;
+                        if (child.geometry) {
+                            child.geometry.computeVertexNormals();
+                        }
                         if (child.material) {
-                            child.material.roughness = Math.max(child.material.roughness, 0.5);
+                            child.material.roughness = Math.max(child.material.roughness, 0.45);
                             child.material.needsUpdate = true;
                         }
                     }
                 });
+                if (this.proceduralBody) {
+                    this.proceduralBody.visible = false;
+                }
                 this.group.add(model);
                 this.loaded = true;
                 console.log("[Buildings] Successfully loaded cottage.glb model.");

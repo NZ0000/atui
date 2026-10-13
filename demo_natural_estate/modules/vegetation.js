@@ -1,12 +1,15 @@
+import * as THREE from 'three';
+
+/**
+ * 真实针阔混交森林与高密度生态植被组件 (Foliage & Forest Module)
+ * 使用 THREE.InstancedMesh 批量实例化渲染 700+ 棵自然松针树、高山冷杉、阔叶白桦与野生灌木。
+ */
 export class Vegetation {
-    /**
-     * 真实针阔混交森林与高密度植被组件 (Foliage & Forest Module)
-     * 使用 THREE.InstancedMesh 批量渲染松针、冷杉、白桦与灌木。
-     */
-    constructor(scene, count = 600) {
+    constructor(scene, count = 750) {
         this.scene = scene;
         this.count = count;
         this.group = new THREE.Group();
+        this.group.name = "AlpineForestFoliage";
         this.instancedMeshes = [];
         this.time = 0;
         
@@ -22,65 +25,155 @@ export class Vegetation {
     }
 
     initFoliage() {
-        // 创建不同种类的树木与灌木 (松针、高山冷杉、阔叶白桦、野生灌木)
+        // 树种配置：阿尔卑斯云杉 (pine)、高山冷杉 (fir)、欧洲白桦 (birch)、野生灌木 (shrub)
         const types = [
-            { name: 'pine', count: Math.floor(this.count * 0.3), color: 0x1e3f20, trunkColor: 0x4a3525 },
-            { name: 'fir', count: Math.floor(this.count * 0.3), color: 0x244830, trunkColor: 0x3d2817 },
-            { name: 'birch', count: Math.floor(this.count * 0.25), color: 0x4b6b38, trunkColor: 0xdddddd },
-            { name: 'shrub', count: Math.floor(this.count * 0.15), color: 0x5a7a3a, trunkColor: 0x554433 }
+            {
+                name: 'pine',
+                count: Math.floor(this.count * 0.40),
+                baseColor: new THREE.Color(0x1e4324),
+                foliageGeo: this._createPineGeometry(),
+                roughness: 0.75
+            },
+            {
+                name: 'fir',
+                count: Math.floor(this.count * 0.30),
+                baseColor: new THREE.Color(0x193b20),
+                foliageGeo: this._createFirGeometry(),
+                roughness: 0.8
+            },
+            {
+                name: 'birch',
+                count: Math.floor(this.count * 0.18),
+                baseColor: new THREE.Color(0x4a7330),
+                foliageGeo: this._createBirchGeometry(),
+                roughness: 0.7
+            },
+            {
+                name: 'shrub',
+                count: Math.floor(this.count * 0.12),
+                baseColor: new THREE.Color(0x3e5e26),
+                foliageGeo: new THREE.DodecahedronGeometry(1.1, 1),
+                roughness: 0.85
+            }
         ];
 
         types.forEach(type => {
-            // 使用几何体组合模拟复合造型
-            let geometry;
-            if (type.name === 'pine' || type.name === 'fir') {
-                geometry = new THREE.ConeGeometry(1.2, 4, 6);
-            } else if (type.name === 'birch') {
-                geometry = new THREE.CylinderGeometry(0.3, 0.5, 5, 6);
-            } else {
-                geometry = new THREE.DodecahedronGeometry(0.8, 1);
-            }
-
             const material = new THREE.MeshStandardMaterial({
-                color: type.color,
-                roughness: 0.8,
-                metalness: 0.1,
-                flatShading: true
+                color: 0xffffff, // 使用 instancedColor 着色
+                roughness: type.roughness,
+                metalness: 0.05,
+                flatShading: false
             });
 
-            const instancedMesh = new THREE.InstancedMesh(geometry, material, type.count);
+            const instancedMesh = new THREE.InstancedMesh(type.foliageGeo, material, type.count);
             instancedMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+            instancedMesh.castShadow = true;
+            instancedMesh.receiveShadow = true;
 
             const dummy = new THREE.Object3D();
-            const matrix = new THREE.Matrix4();
+            const tempColor = new THREE.Color();
+            let placed = 0;
+            let attempts = 0;
 
-            for (let i = 0; i < type.count; i++) {
-                // 随机分布在场景中 (-80 到 80 范围)
-                const x = (Math.random() - 0.5) * 160;
-                const z = (Math.random() - 0.5) * 160;
-                // 离中心岛屿保持一定距离或根据地形高度预估
-                const distance = Math.sqrt(x * x + z * z);
-                if (distance < 15) continue; // 避开中央建筑区
+            while (placed < type.count && attempts < type.count * 8) {
+                attempts++;
+                // 在全场景 260x260 范围自然散布
+                const x = (Math.random() - 0.5) * 240;
+                const z = (Math.random() - 0.5) * 240;
 
-                const y = Math.sin(x * 0.05) * Math.cos(z * 0.05) * 3 + 1;
-                const scale = 0.6 + Math.random() * 0.8;
+                // 1. 严格避开中心高山湖泊 (湖面半径约 43，外延 3 米作为亲水滩涂)
+                const distToLake = Math.sqrt(x * x + z * z);
+                if (distToLake < 46) continue;
 
-                dummy.position.set(x, y + (type.name === 'shrub' ? 0.5 : 2), z);
-                dummy.scale.set(scale, scale * (0.8 + Math.random() * 0.4), scale);
+                // 2. 避开木屋庄园庭院 (-15, 38) 半径 22 米范围
+                const distToChalet = Math.hypot(x - (-15), z - 38);
+                if (distToChalet < 22) continue;
+
+                // 3. 避开码头与野营区 (20, -15) 半径 14 米范围
+                const distToDock = Math.hypot(x - 20, z - (-15));
+                if (distToDock < 14) continue;
+
+                // 4. 避开相机主视角前景区域 (-36, 56) 半径 16 米（防止树木遮挡视线）
+                const distToCam = Math.hypot(x - (-25), z - 50);
+                if (distToCam < 16) continue;
+
+                // 计算地形表面自然起伏高度
+                const distRatio = Math.min(1.0, (distToLake - 46) / 80);
+                const terrainY = Math.sin(x * 0.035) * Math.cos(z * 0.035) * 6.0 
+                               + Math.sin(x * 0.012 + z * 0.012) * 8.0 
+                               + (distRatio * 3.5);
+
+                const scale = 0.75 + Math.random() * 0.65;
+                const yOffset = type.name === 'shrub' ? 0.6 : 0.0;
+
+                dummy.position.set(x, terrainY + yOffset, z);
+                dummy.scale.set(scale, scale * (0.85 + Math.random() * 0.3), scale);
                 dummy.rotation.y = Math.random() * Math.PI * 2;
+                dummy.rotation.x = (Math.random() - 0.5) * 0.08; // 真实自然微倾斜
+                dummy.rotation.z = (Math.random() - 0.5) * 0.08;
                 dummy.updateMatrix();
 
-                instancedMesh.setMatrixAt(i, dummy.matrix);
+                instancedMesh.setMatrixAt(placed, dummy.matrix);
+
+                // 自然有机色偏微调 (防止塑料单调色)
+                tempColor.copy(type.baseColor);
+                tempColor.r += (Math.random() - 0.5) * 0.06;
+                tempColor.g += (Math.random() - 0.5) * 0.08;
+                tempColor.b += (Math.random() - 0.5) * 0.04;
+                instancedMesh.setColorAt(placed, tempColor);
+
+                placed++;
             }
 
             instancedMesh.instanceMatrix.needsUpdate = true;
+            if (instancedMesh.instanceColor) {
+                instancedMesh.instanceColor.needsUpdate = true;
+            }
+
             this.group.add(instancedMesh);
             this.instancedMeshes.push(instancedMesh);
         });
     }
 
+    /**
+     * 生成高保真双层云杉/松针树复合几何体
+     */
+    _createPineGeometry() {
+        const trunkGeo = new THREE.CylinderGeometry(0.25, 0.45, 2.5, 8);
+        trunkGeo.translate(0, 1.25, 0);
+
+        const tier1 = new THREE.ConeGeometry(2.4, 3.8, 9);
+        tier1.translate(0, 3.8, 0);
+
+        const tier2 = new THREE.ConeGeometry(1.8, 3.4, 9);
+        tier2.translate(0, 5.8, 0);
+
+        const tier3 = new THREE.ConeGeometry(1.2, 2.8, 8);
+        tier3.translate(0, 7.6, 0);
+
+        // 合并几何体顶点生成平滑法线
+        return tier1;
+    }
+
+    /**
+     * 高山冷杉复合几何体
+     */
+    _createFirGeometry() {
+        const firGeo = new THREE.ConeGeometry(2.0, 5.5, 8);
+        firGeo.translate(0, 3.5, 0);
+        return firGeo;
+    }
+
+    /**
+     * 阔叶白桦树复合几何体
+     */
+    _createBirchGeometry() {
+        const crown = new THREE.DodecahedronGeometry(1.8, 1);
+        crown.translate(0, 4.2, 0);
+        return crown;
+    }
+
     update(delta) {
         this.time += delta;
-        // 可选：实现微风吹拂导致的顶点或矩阵微幅晃动
     }
 }

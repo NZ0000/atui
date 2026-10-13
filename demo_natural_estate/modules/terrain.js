@@ -8,7 +8,7 @@
  * - Implements lifecycle contract: constructor(scene, options), addTo(scene), update(delta).
  */
 
-import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
+import * as THREE from 'three';
 
 export class Terrain {
     constructor(scene, options = {}) {
@@ -176,6 +176,7 @@ export class Terrain {
             shader.uniforms.uTime = { value: 0.0 };
             this._waterUniforms = shader.uniforms;
 
+            shader.vertexShader = 'uniform float uTime;\n' + shader.vertexShader;
             shader.vertexShader = shader.vertexShader.replace(
                 '#include <begin_vertex>',
                 `
@@ -206,47 +207,38 @@ export class Terrain {
     }
 
     /**
-     * Build winding dirt paths around the terrain and lake
+     * Build natural cobblestone stepping stones connecting chalet to the lake dock
      */
     _buildPathsAndBanks() {
-        // Create a curved path leading from edge to lake
-        const curve = new THREE.CatmullRomCurve3([
-            new THREE.Vector3(-120, 0.2, 120),
-            new THREE.Vector3(-60, 0.4, 60),
-            new THREE.Vector3(-42, 0.0, 30),
-            new THREE.Vector3(-35, -0.2, 0),
-            new THREE.Vector3(-45, 0.1, -40),
-            new THREE.Vector3(-80, 0.5, -100)
-        ]);
-
-        const pathGeo = new THREE.TubeGeometry(curve, 64, 3.5, 8, false);
-        
-        // Dirt texture canvas
-        const dirtCanvas = document.createElement('canvas');
-        dirtCanvas.width = 256;
-        dirtCanvas.height = 256;
-        const dCtx = dirtCanvas.getContext('2d');
-        dCtx.fillStyle = '#6b533a';
-        dCtx.fillRect(0, 0, 256, 256);
-        for (let i = 0; i < 4000; i++) {
-            dCtx.fillStyle = Math.random() > 0.5 ? '#59442e' : '#7d6245';
-            dCtx.fillRect(Math.random() * 256, Math.random() * 256, 3, 3);
-        }
-        const dirtTex = new THREE.CanvasTexture(dirtCanvas);
-        dirtTex.wrapS = THREE.RepeatWrapping;
-        dirtTex.wrapT = THREE.RepeatWrapping;
-        dirtTex.repeat.set(10, 1);
-
-        const dirtMat = new THREE.MeshStandardMaterial({
-            map: dirtTex,
-            roughness: 0.9,
-            metalness: 0.05
+        const stoneGeo = new THREE.CylinderGeometry(0.7, 0.8, 0.15, 7);
+        const stoneMat = new THREE.MeshStandardMaterial({
+            color: 0x8a8479,
+            roughness: 0.85,
+            metalness: 0.1
         });
 
-        const pathMesh = new THREE.Mesh(pathGeo, dirtMat);
-        pathMesh.position.y = 0.1;
-        pathMesh.receiveShadow = true;
-        this.group.add(pathMesh);
+        const pathGroup = new THREE.Group();
+        pathGroup.name = "SteppingStonesPath";
+
+        // From chalet (-15, 38) towards lake dock (20, -15)
+        const waypoints = [
+            [-13, 28], [-11, 24], [-9, 20], [-6, 16], [-3, 12],
+            [0, 8], [4, 4], [8, 0], [12, -4], [16, -8], [19, -12]
+        ];
+
+        waypoints.forEach(([x, z], idx) => {
+            const stone = new THREE.Mesh(stoneGeo, stoneMat);
+            const distToLake = Math.sqrt(x * x + z * z);
+            const y = distToLake < 42 ? 0.05 : 0.4 + (distToLake - 42) * 0.05;
+            stone.position.set(x + (Math.random() - 0.5) * 0.4, y, z + (Math.random() - 0.5) * 0.4);
+            stone.rotation.y = Math.random() * Math.PI;
+            stone.scale.set(0.9 + Math.random() * 0.3, 1.0, 0.9 + Math.random() * 0.3);
+            stone.castShadow = true;
+            stone.receiveShadow = true;
+            pathGroup.add(stone);
+        });
+
+        this.group.add(pathGroup);
     }
 
     addTo(scene) {

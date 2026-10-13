@@ -9,6 +9,7 @@ tools:
   - test_runner
   - web_validator
   - browser_test
+  - browser_interact
   - batch_run
   - vendor_assets
   - web_search
