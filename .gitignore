@@ -7,3 +7,5 @@ htmlcov/
 *.log
 .DS_Store
 deliverables/
+ref/
+reference/
