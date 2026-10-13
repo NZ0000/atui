@@ -809,13 +809,16 @@ class ConcurrentModularPipeline:
                 draft_task = (
                     f"【验收条件制定任务（规划期）】\n"
                     f"迭代目标：{task}\n\n"
-                    f"你是验收标准的制定者，不是执行者。请基于迭代目标制定一套机器可验证的硬性验收条件（condition_gate 规格）。\n"
+                    f"项目类型自动检测：{json.dumps(self._detect_project_profile(proj.path), ensure_ascii=False)}\n\n"
+                    f"你是验收标准的制定者，不是执行者。请基于迭代目标与项目类型制定一套机器可验证的硬性验收条件（condition_gate 规格）。\n"
                     f"可用条件类型：file_exists / file_count_min / file_size_min / content_contains / "
                     f"text_search / code_reference_integrity / web_runtime_clean / command / script。\n"
-                    f"要求：条件必须客观可判定、与任务硬指标一一对应、避免主观描述；必须根据项目类型选择条件——"
-                    f"web/H5 项目才使用 web_runtime_clean（控制台零报错）与浏览器类验证，python/lua/c 项目改用 "
-                    f"command/script 类条件（如 pytest、luacheck、gcc 编译零警告），严禁给非 web 项目强加浏览器类条件；"
-                    f"若项目存在 models/ 资产目录，必须包含资产引用完整性检查；不要包含无法在本机验证的条件。\n"
+                    f"要求：条件必须客观可判定、与任务硬指标一一对应、避免主观描述；必须与上面检测到的项目类型匹配——"
+                    f"web/H5 项目才使用 web_runtime_clean（控制台零报错）与浏览器类验证；python 项目用 pytest；"
+                    f"php 项目用 `php -l`（语法零错误）；lua 项目用 luacheck；c 项目用 gcc/clang 编译零警告；"
+                    f"含 sql 的项目可用 sqlfluff 或 mysql 客户端执行校验查询；严禁给项目类型之外强加不相关的验证条件；"
+                    f"若项目存在真实 3D 资产（models/ 下有 .glb/.gltf 文件），必须包含资产引用完整性检查；"
+                    f"不要包含无法在本机验证的条件。\n"
                     f"输出格式：仅在报告中输出一个 ```json 代码块，内容为 {{\"mode\": \"all\", \"conditions\": [...]}} 规格，"
                     f"不要输出其它 JSON。"
                 )
@@ -1176,11 +1179,29 @@ class ConcurrentModularPipeline:
             return any(n.endswith(ext) for n in names)
 
         return {
-            "web": "index.html" in names or "package.json" in names,
+            # web = rendered in a browser (html or php server or node project)
+            "web": "index.html" in names or "package.json" in names or "index.php" in names,
             "python": _has(".py"),
             "lua": _has(".lua"),
+            "php": _has(".php"),
+            "sql": _has(".sql"),
             "c": "Makefile" in names or "CMakeLists.txt" in names or _has(".c"),
         }
+
+    @staticmethod
+    def _has_3d_assets(project_path: str) -> bool:
+        """
+        A models/ dir only means 3D assets when it actually contains .glb/.gltf files.
+        MVC-style models/ dirs (php/java business classes) must NOT trigger the
+        asset-reference baseline, or the gate would false-fail forever.
+        """
+        models_dir = os.path.join(project_path, "models")
+        if not os.path.isdir(models_dir):
+            return False
+        try:
+            return any(fn.lower().endswith((".glb", ".gltf")) for fn in os.listdir(models_dir))
+        except Exception:
+            return False
 
     @staticmethod
     def _merge_baseline_conditions(
@@ -1196,8 +1217,9 @@ class ConcurrentModularPipeline:
         existing_types = {c.get("type") for c in conds if isinstance(c, dict)}
         profile = ConcurrentModularPipeline._detect_project_profile(project_path)
 
-        # Any project shipping a models/ asset dir: references must resolve on disk
-        if os.path.isdir(os.path.join(project_path, "models")) and "code_reference_integrity" not in existing_types:
+        # Only true 3D-asset projects (models/ holding .glb/.gltf): references must resolve.
+        # MVC-style models/ dirs must not trigger this or the gate false-fails forever.
+        if self._has_3d_assets(project_path) and "code_reference_integrity" not in existing_types:
             conds.append({
                 "type": "code_reference_integrity",
                 "scan_glob": "*.js",

@@ -249,6 +249,30 @@ def test_acceptance_authority_helpers():
                 {"mode": "all", "conditions": []}, tmp_py, "http://127.0.0.1:8088/x.html"
             )
             assert "web_runtime_clean" not in [c["type"] for c in merged_py["conditions"]]
+            assert pipeline._detect_project_profile(tmp_py)["python"] is True
+
+        # --- mixed php/sql/html project ---
+        with tempfile.TemporaryDirectory() as tmp_php:
+            for fn in ("index.php", "db.sql", "style.css"):
+                open(os.path.join(tmp_php, fn), "w").close()
+            profile_php = pipeline._detect_project_profile(tmp_php)
+            assert profile_php["web"] is True and profile_php["php"] is True and profile_php["sql"] is True
+            # MVC-style models/ dir WITHOUT glb files must NOT trigger asset baseline
+            os.makedirs(os.path.join(tmp_php, "models"))
+            open(os.path.join(tmp_php, "models", "User.php"), "w").close()
+            merged_php = pipeline._merge_baseline_conditions(
+                {"mode": "all", "conditions": []}, tmp_php, "http://127.0.0.1:8088/"
+            )
+            php_types = [c["type"] for c in merged_php["conditions"]]
+            assert "code_reference_integrity" not in php_types
+            assert "web_runtime_clean" in php_types
+
+        # --- true 3D asset dir DOES trigger asset baseline ---
+        with tempfile.TemporaryDirectory() as tmp_3d:
+            os.makedirs(os.path.join(tmp_3d, "models"))
+            open(os.path.join(tmp_3d, "models", "flamingo.glb"), "wb").close()
+            merged_3d = pipeline._merge_baseline_conditions({"mode": "all", "conditions": []}, tmp_3d)
+            assert "code_reference_integrity" in [c["type"] for c in merged_3d["conditions"]]
         # no duplicate injection
         merged2 = pipeline._merge_baseline_conditions(merged, tmp, "http://127.0.0.1:8088/index.html")
         assert [c["type"] for c in merged2["conditions"]].count("code_reference_integrity") == 1
