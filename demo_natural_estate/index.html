@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>高山湖畔庄园 - 3D 自然生态复合大场景</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #0b131a;
+            color: #f0f4f8;
+        }
+        #webgl-container {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        /* HUD UI Overlay */
+        #hud-container {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            max-width: 340px;
+        }
+        .hud-panel {
+            background: rgba(15, 23, 36, 0.82);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 12px;
+            padding: 18px;
+            pointer-events: auto;
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+        }
+        h1 {
+            font-size: 18px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            color: #ffffff;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        h1::before {
+            content: '';
+            display: inline-block;
+            width: 8px;
+            height: 18px;
+            background: #4ade80;
+            border-radius: 4px;
+        }
+        p.subtitle {
+            font-size: 12px;
+            color: #94a3b8;
+            margin-bottom: 14px;
+            line-height: 1.4;
+        }
+        .control-group {
+            margin-bottom: 12px;
+        }
+        .control-group:last-child {
+            margin-bottom: 0;
+        }
+        label {
+            display: block;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: #cbd5e1;
+            margin-bottom: 6px;
+        }
+        .btn-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
+        }
+        button {
+            background: rgba(30, 41, 59, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #e2e8f0;
+            padding: 8px 10px;
+            font-size: 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: center;
+            font-weight: 500;
+        }
+        button:hover {
+            background: rgba(51, 65, 85, 1);
+            border-color: rgba(255, 255, 255, 0.3);
+            transform: translateY(-1px);
+        }
+        button.active {
+            background: #2563eb;
+            border-color: #60a5fa;
+            color: #ffffff;
+            box-shadow: 0 0 12px rgba(37, 99, 235, 0.4);
+        }
+        .checkbox-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: #e2e8f0;
+            cursor: pointer;
+            margin-top: 8px;
+        }
+        .checkbox-row input {
+            accent-color: #2563eb;
+            width: 15px;
+            height: 15px;
+            cursor: pointer;
+        }
+        /* Loading Overlay */
+        #loader-mask {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #090d12;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.6s ease;
+        }
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-left-color: #4ade80;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 16px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .loader-text {
+            font-size: 14px;
+            color: #94a3b8;
+            letter-spacing: 1px;
+        }
+    </style>
+
+    <!-- Importmap for Local Self-Contained Vendor Modules -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "./vendor/three.module.js",
+            "three/addons/": "./vendor/addons/"
+        }
+    }
+    </script>
+</head>
+<body>
+    <!-- Loading Mask -->
+    <div id="loader-mask">
+        <div class="spinner"></div>
+        <div class="loader-text">正在加载自然庄园生态大场景...</div>
+    </div>
+
+    <!-- WebGL Canvas Container -->
+    <div id="webgl-container"></div>
+
+    <!-- HUD Control Panel -->
+    <div id="hud-container">
+        <div class="hud-panel">
+            <h1>高山湖畔庄园</h1>
+            <p class="subtitle">自然生态复合大场景 • 湖光山色与木屋度假区</p>
+
+            <div class="control-group">
+                <label>日光时间段切换</label>
+                <div class="btn-row">
+                    <button id="btn-noon" class="active">明媚正午</button>
+                    <button id="btn-sunset">夕阳余晖</button>
+                    <button id="btn-night">宁静夜晚</button>
+                </div>
+            </div>
+
+            <div class="control-group" style="margin-top: 12px;">
+                <label>导览视角定位</label>
+                <div class="btn-row">
+                    <button id="cam-overview">全局鸟瞰</button>
+                    <button id="cam-chalet">木屋特写</button>
+                    <button id="cam-dock">湖畔码头</button>
+                </div>
+            </div>
+
+            <div class="control-group" style="margin-top: 12px;">
+                <label>场景组件显隐</label>
+                <label class="checkbox-row">
+                    <input type="checkbox" id="toggle-terrain" checked> 显示地形与湖泊
+                </label>
+                <label class="checkbox-row">
+                    <input type="checkbox" id="toggle-buildings" checked> 显示木屋庄园
+                </label>
+                <label class="checkbox-row">
+                    <input type="checkbox" id="toggle-vegetation" checked> 显示茂密森林
+                </label>
+                <label class="checkbox-row">
+                    <input type="checkbox" id="toggle-props" checked> 显示码头与小猫
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Entry Module -->
+    <script type="module" src="./index.js"></script>
+</body>
+</html>
