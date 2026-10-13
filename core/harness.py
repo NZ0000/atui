@@ -137,11 +137,46 @@ class AgentHarness:
                         self.role.name
                     )
 
+                    # Prepare tool result for message payload
+                    clean_result = tool_result
+                    b64_img = None
+                    if isinstance(tool_result, dict) and isinstance(tool_result.get("data"), dict):
+                        b64_img = tool_result["data"].get("screenshot_base64")
+                        if b64_img:
+                            # Avoid duplicate massive base64 in tool string
+                            clean_result = dict(tool_result)
+                            clean_data = dict(clean_result["data"])
+                            clean_data["screenshot_base64"] = f"<PNG image {clean_data.get('screenshot_size_bytes', 0)} bytes captured>"
+                            clean_result["data"] = clean_data
+
                     messages.append({
                         "role": "tool",
                         "tool_call_id": call_id,
-                        "content": json.dumps(tool_result, ensure_ascii=False)
+                        "content": json.dumps(clean_result, ensure_ascii=False)
                     })
+
+                    # Inject multimodal visual feedback turn if image was produced
+                    if b64_img:
+                        messages.append({
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": (
+                                        f"[视觉多模态感知回传 - Visual Render Observation]\n"
+                                        f"以下是浏览器无头环境实时渲染截取的真实视口画面（保存路径: {tool_result['data'].get('screenshot_path')}）。\n"
+                                        f"请从专业设计师与资深图形学工程师视角审查该画面：\n"
+                                        f"1. 3D 场景光影是否清晰可见？是否存在画面过暗（黑黢麻黑）或过曝？\n"
+                                        f"2. 几何体模型结构是否饱满、材质金属度/粗糙度是否合理？\n"
+                                        f"3. HUD 与文字排版是否协调？如发现任何视觉缺陷，请立即针对性修改代码优化！"
+                                    )
+                                },
+                                {
+                                    "type": "image_url",
+                                    "image_url": {"url": f"data:image/png;base64,{b64_img}"}
+                                }
+                            ]
+                        })
                 continue
 
             gate_ok, gate_reason = self._check_output_gate(output_file)

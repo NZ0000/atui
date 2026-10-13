@@ -69,6 +69,18 @@ def list_available_tools() -> List[Dict[str, Any]]:
 def execute_tool_api(tool_name: str, params: Dict[str, Any]) -> Dict[str, Any]:
     return tools.execute_tool(tool_name, params)
 
+def run_tools_batch(calls: List[Dict[str, Any]], stop_on_error: bool = False) -> Dict[str, Any]:
+    """Execute multiple tools in batch sequentially or stop on error."""
+    return tools.execute_tool("batch_run", {"calls": calls, "stop_on_error": stop_on_error})
+
+def validate_web_code(path: str, content: Optional[str] = None, file_type: str = "auto") -> Dict[str, Any]:
+    """Validate HTML, CSS, JS syntax with V8 engine and strict parser."""
+    return tools.execute_tool("web_validator", {"path": path, "content": content, "file_type": file_type})
+
+def test_browser_page(url_or_path: str, screenshot_path: Optional[str] = None, wait_ms: int = 2500) -> Dict[str, Any]:
+    """Run headless browser test, capture console errors and screenshot."""
+    return tools.execute_tool("browser_test", {"url_or_path": url_or_path, "screenshot_path": screenshot_path, "wait_ms": wait_ms})
+
 def subscribe_events(callback: Callable[[Event], None]):
     default_bus.subscribe(callback)
 

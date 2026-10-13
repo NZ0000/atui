@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>赛博朋克科幻浮空空间站 | Cyberpunk Space Station 3D</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #030508;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            color: #00ffff;
+        }
+        #canvas-container {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        /* HUD UI Styling */
+        #hud-container {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 320px;
+            background: rgba(5, 12, 25, 0.85);
+            border: 1px solid rgba(0, 255, 255, 0.4);
+            border-radius: 4px;
+            padding: 16px;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.15), inset 0 0 15px rgba(0, 255, 255, 0.05);
+            backdrop-filter: blur(8px);
+            pointer-events: none;
+            z-index: 10;
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+        #hud-container::before {
+            content: '';
+            position: absolute;
+            top: -1px;
+            left: -1px;
+            width: 10px;
+            height: 10px;
+            border-top: 2px solid #00ffff;
+            border-left: 2px solid #00ffff;
+        }
+        #hud-container::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            right: -1px;
+            width: 10px;
+            height: 10px;
+            border-bottom: 2px solid #00ffff;
+            border-right: 2px solid #00ffff;
+        }
+        .hud-header {
+            font-size: 13px;
+            letter-spacing: 2px;
+            color: #ff00ff;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .hud-header span {
+            font-size: 10px;
+            color: #00ffcc;
+            background: rgba(0,255,204,0.1);
+            padding: 2px 6px;
+            border-radius: 2px;
+        }
+        .hud-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #ffffff;
+            margin-bottom: 10px;
+            text-shadow: 0 0 8px rgba(0, 255, 255, 0.6);
+        }
+        .hud-desc {
+            font-size: 12px;
+            color: #a0c0d0;
+            line-height: 1.5;
+            margin-bottom: 12px;
+            border-bottom: 1px dashed rgba(0, 255, 255, 0.2);
+            padding-bottom: 8px;
+        }
+        .hud-metric {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            margin-bottom: 6px;
+        }
+        .hud-metric .label {
+            color: #70a0c0;
+        }
+        .hud-metric .value {
+            color: #00ffff;
+            font-weight: bold;
+            font-family: monospace;
+        }
+        .progress-bar-container {
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            margin-top: 4px;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        .progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00ffff, #ff00ff);
+            width: 85%;
+            transition: width 0.3s ease;
+        }
+
+        /* Controls Tip */
+        #controls-tip {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(5, 12, 25, 0.8);
+            border: 1px solid rgba(0, 255, 255, 0.2);
+            padding: 12px 18px;
+            border-radius: 4px;
+            font-size: 12px;
+            color: #80c0e0;
+            backdrop-filter: blur(5px);
+            pointer-events: none;
+            z-index: 10;
+        }
+        #controls-tip b {
+            color: #00ffff;
+        }
+
+        /* Loading Screen */
+        #loader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #020408;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 999;
+            transition: opacity 0.8s ease;
+        }
+        .loader-spinner {
+            width: 60px;
+            height: 60px;
+            border: 3px solid rgba(0, 255, 255, 0.1);
+            border-top: 3px solid #00ffff;
+            border-right: 3px solid #ff00ff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+        .loader-text {
+            font-size: 14px;
+            letter-spacing: 4px;
+            color: #00ffff;
+            text-transform: uppercase;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+
+    <!-- Import Map for Modern Three.js r160+ (Compatible with both http:// and file:/// via CORS wildcard) -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+    <div id="loader">
+        <div class="loader-spinner"></div>
+        <div class="loader-text">Initializing Orbital Station...</div>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <div id="hud-container">
+        <div class="hud-header">SYS_TELEMETRY <span>ONLINE</span></div>
+        <div class="hud-title" id="hud-name">NEXUS PRIME ORBITAL</div>
+        <div class="hud-desc" id="hud-desc">Multi-tier modular space station operating in low Earth cyberpunk orbit. Hover over modules for diagnostics.</div>
+        <div class="hud-metric">
+            <span class="label">POWER OUTPUT</span>
+            <span class="value" id="hud-power">98.4%</span>
+        </div>
+        <div class="progress-bar-container">
+            <div class="progress-bar-fill" id="hud-progress" style="width: 98.4%;"></div>
+        </div>
+        <div class="hud-metric" style="margin-top: 10px;">
+            <span class="label">CORE TEMP</span>
+            <span class="value" id="hud-temp">1,420 K</span>
+        </div>
+        <div class="hud-metric">
+            <span class="label">GRAVITY SYNC</span>
+            <span class="value">1.02 G</span>
+        </div>
+    </div>
+
+    <div id="controls-tip">
+        <b>[鼠标左键 + 拖拽]</b> 旋转视角 &nbsp;|&nbsp; <b>[右键 + 拖拽]</b> 平移 &nbsp;|&nbsp; <b>[滚轮]</b> 缩放 &nbsp;|&nbsp; <b>[悬停]</b> 模块诊断
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // --- 1. Scene, Camera, Renderer Setup ---
+        const container = document.getElementById('canvas-container');
+        
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x020408);
+        scene.fog = new THREE.FogExp2(0x060914, 0.008);
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.5, 1000);
+        camera.position.set(0, 35, 90);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.4;
+        container.appendChild(renderer.domElement);
+
+        // --- 2. Controls ---
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.minDistance = 25;
+        controls.maxDistance = 200;
+        controls.maxPolarAngle = Math.PI / 2 + 0.3; // Allow slight look-up
+
+        // --- 3. Enhanced Rich Multi-Source Lighting (Fixes "Dark 3D" Issue) ---
+        // 3.1 Hemisphere Light (Sky ambient + Ground planetary bounce)
+        const hemiLight = new THREE.HemisphereLight(0x88bbff, 0x223355, 2.2);
+        scene.add(hemiLight);
+
+        // 3.2 Ambient Light
+        const ambientLight = new THREE.AmbientLight(0x406088, 1.8);
+        scene.add(ambientLight);
+
+        // 3.3 Main Sun Directional Light (Warm White with Soft Shadow)
+        const mainDirLight = new THREE.DirectionalLight(0xffffff, 3.5);
+        mainDirLight.position.set(70, 90, 60);
+        mainDirLight.castShadow = true;
+        mainDirLight.shadow.mapSize.width = 2048;
+        mainDirLight.shadow.mapSize.height = 2048;
+        mainDirLight.shadow.bias = -0.0001;
+        mainDirLight.shadow.camera.near = 10;
+        mainDirLight.shadow.camera.far = 300;
+        const d = 50;
+        mainDirLight.shadow.camera.left = -d;
+        mainDirLight.shadow.camera.right = d;
+        mainDirLight.shadow.camera.top = d;
+        mainDirLight.shadow.camera.bottom = -d;
+        scene.add(mainDirLight);
+
+        // 3.4 Secondary Rim Light (Cyan rim from back-bottom to sharply outline structures)
+        const rimLight = new THREE.DirectionalLight(0x00d4ff, 2.2);
+        rimLight.position.set(-60, -40, -50);
+        scene.add(rimLight);
+
+        // 3.5 Cyberpunk Neon Point Lights with expanded radius and glow
+        const cyanNeonLight = new THREE.PointLight(0x00ffff, 8, 120);
+        cyanNeonLight.position.set(0, 10, 0);
+        scene.add(cyanNeonLight);
+
+        const magentaNeonLight = new THREE.PointLight(0xff00bb, 8, 120);
+        magentaNeonLight.position.set(0, -10, 0);
+        scene.add(magentaNeonLight);
+
+        // --- 4. Background Starfield & Nebula Particles ---
+        const starCount = 2000;
+        const starGeometry = new THREE.BufferGeometry();
+        const starPositions = new Float32Array(starCount * 3);
+        const starColors = new Float32Array(starCount * 3);
+
+        const colorPalette = [
+            new THREE.Color(0xffffff),
+            new THREE.Color(0x88ccff),
+            new THREE.Color(0xff88cc),
+            new THREE.Color(0x88ffcc)
+        ];
+
+        for (let i = 0; i < starCount * 3; i += 3) {
+            starPositions[i] = (Math.random() - 0.5) * 500;
+            starPositions[i + 1] = (Math.random() - 0.5) * 500;
+            starPositions[i + 2] = (Math.random() - 0.5) * 500;
+
+            const col = colorPalette[Math.floor(Math.random() * colorPalette.length)];
+            starColors[i] = col.r;
+            starColors[i + 1] = col.g;
+            starColors[i + 2] = col.b;
+        }
+
+        starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+        starGeometry.setAttribute('color', new THREE.BufferAttribute(starColors, 3));
+
+        const starMaterial = new THREE.PointsMaterial({
+            size: 1.2,
+            vertexColors: true,
+            transparent: true,
+            opacity: 0.8
+        });
+
+        const starField = new THREE.Points(starGeometry, starMaterial);
+        scene.add(starField);
+
+        // --- 5. Procedural Space Station Construction ---
+        const interactiveObjects = []; // For Raycasting
+
+        const stationGroup = new THREE.Group();
+        scene.add(stationGroup);
+
+        // Materials (Upgraded: bright metallic reflection, no pitch-black surfaces)
+        const matDarkMetal = new THREE.MeshStandardMaterial({
+            color: 0x485870, // Titanium slate metal (bright visible surface)
+            metalness: 0.65,
+            roughness: 0.35
+        });
+
+        const matLightMetal = new THREE.MeshStandardMaterial({
+            color: 0xb0c4de, // Polished silver-blue steel
+            metalness: 0.8,
+            roughness: 0.2
+        });
+
+        const matGoldTrim = new THREE.MeshStandardMaterial({
+            color: 0xf5c242,
+            metalness: 0.85,
+            roughness: 0.2
+        });
+
+        const matCyanEnergy = new THREE.MeshStandardMaterial({
+            color: 0x00ffff,
+            emissive: 0x00ffff,
+            emissiveIntensity: 3.5,
+            roughness: 0.1
+        });
+
+        const matMagentaGlow = new THREE.MeshStandardMaterial({
+            color: 0xff00bb,
+            emissive: 0xff00bb,
+            emissiveIntensity: 3.5,
+            roughness: 0.1
+        });
+
+        const matSolarPanel = new THREE.MeshStandardMaterial({
+            color: 0x1b4070,
+            metalness: 0.6,
+            roughness: 0.3,
+            emissive: 0x0055aa,
+            emissiveIntensity: 0.5
+        });
+
+        // 5.1 Core Reactor Cylinder (Main Body)
+        const coreGeo = new THREE.CylinderGeometry(4, 4, 30, 32);
+        const coreMesh = new THREE.Mesh(coreGeo, matLightMetal);
+        coreMesh.castShadow = true;
+        coreMesh.receiveShadow = true;
+        coreMesh.userData = {
+            name: "中央反应堆核心 (Central Fusion Core)",
+            desc: "空间站的主动力源与反重力场发生器，持续输出稳定暗物质电能。",
+            power: "99.2%",
+            temp: "1,550 K"
+        };
+        stationGroup.add(coreMesh);
+        interactiveObjects.push(coreMesh);
+
+        // Core Glowing Energy Strip Bands
+        for (let i = -12; i <= 12; i += 6) {
+            const ringGeo = new THREE.TorusGeometry(4.1, 0.3, 16, 48);
+            const ringMesh = new THREE.Mesh(ringGeo, matCyanEnergy);
+            ringMesh.rotation.x = Math.PI / 2;
+            ringMesh.position.y = i;
+            stationGroup.add(ringMesh);
+        }
+
+        // 5.2 Dual Counter-Rotating Gravity Rings (Torus)
+        const ringGroup1 = new THREE.Group();
+        const ringGroup2 = new THREE.Group();
+        stationGroup.add(ringGroup1);
+        stationGroup.add(ringGroup2);
+
+        // Ring 1 (Upper, Cyan Accent)
+        const torusGeo1 = new THREE.TorusGeometry(16, 1.8, 24, 64);
+        const torusMesh1 = new THREE.Mesh(torusGeo1, matDarkMetal);
+        torusMesh1.rotation.x = Math.PI / 2;
+        torusMesh1.position.y = 6;
+        torusMesh1.castShadow = true;
+        torusMesh1.receiveShadow = true;
+        torusMesh1.userData = {
+            name: "上层居住与重力环 (Upper Habitat Torus)",
+            desc: "通过持续反向旋转产生 1G 离心重力，供常驻科研与操作人员生活居住。",
+            power: "96.5%",
+            temp: "295 K"
+        };
+        ringGroup1.add(torusMesh1);
+        interactiveObjects.push(torusMesh1);
+
+        // Ring 1 Spokes & Hubs
+        for (let i = 0; i < 4; i++) {
+            const angle = (i * Math.PI) / 2;
+            const spokeGeo = new THREE.CylinderGeometry(0.6, 0.6, 12, 16);
+            const spoke = new THREE.Mesh(spokeGeo, matLightMetal);
+            spoke.rotation.z = Math.PI / 2;
+            spoke.position.set(Math.cos(angle) * 8, 6, Math.sin(angle) * 8);
+            ringGroup1.add(spoke);
+        }
+
+        // Ring 2 (Lower, Magenta Accent)
+        const torusGeo2 = new THREE.TorusGeometry(22, 2.2, 24, 64);
+        const torusMesh2 = new THREE.Mesh(torusGeo2, matDarkMetal);
+        torusMesh2.rotation.x = Math.PI / 2;
+        torusMesh2.position.y = -6;
+        torusMesh2.castShadow = true;
+        torusMesh2.receiveShadow = true;
+        torusMesh2.userData = {
+            name: "下层工业与量子计算环 (Lower Quantum Ring)",
+            desc: "容纳超级量子计算机集群与重工业合成车间，承载海量星际数据运算。",
+            power: "94.8%",
+            temp: "310 K"
+        };
+        ringGroup2.add(torusMesh2);
+        interactiveObjects.push(torusMesh2);
+
+        // Ring 2 Spokes & Energy Glowing Insets
+        for (let i = 0; i < 6; i++) {
+            const angle = (i * Math.PI) / 3;
+            const spokeGeo = new THREE.CylinderGeometry(0.8, 0.8, 16, 16);
+            const spoke = new THREE.Mesh(spokeGeo, matLightMetal);
+            spoke.rotation.z = Math.PI / 2;
+            spoke.position.set(Math.cos(angle) * 11, -6, Math.sin(angle) * 11);
+            ringGroup2.add(spoke);
+        }
+
+        // 5.3 Radial Docking Bays & Command Tower (Top)
+        const commandTowerGeo = new THREE.CylinderGeometry(2, 3, 8, 16);
+        const commandTower = new THREE.Mesh(commandTowerGeo, matGoldTrim);
+        commandTower.position.y = 18;
+        commandTower.castShadow = true;
+        commandTower.userData = {
+            name: "指挥控制塔台 (Command & Control Hub)",
+            desc: "空间站的神经中枢，负责全域导航、雷达扫描与星际通讯调度。",
+            power: "99.9%",
+            temp: "292 K"
+        };
+        stationGroup.add(commandTower);
+        interactiveObjects.push(commandTower);
+
+        // Radar Dish on top of Command Tower
+        const radarBase = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.5, 1.5), matDarkMetal);
+        radarBase.position.y = 22.5;
+        stationGroup.add(radarBase);
+
+        const radarDishGeo = new THREE.SphereGeometry(3, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2);
+        const radarMesh = new THREE.Mesh(radarDishGeo, matLightMetal);
+        radarMesh.rotation.x = -Math.PI / 4;
+        radarMesh.position.y = 23.5;
+        stationGroup.add(radarMesh);
+
+        // Radial Docking Arms (4 directions)
+        for (let i = 0; i < 4; i++) {
+            const angle = (i * Math.PI) / 2 + Math.PI / 4;
+            const armGroup = new THREE.Group();
+            armGroup.rotation.y = angle;
+
+            const armGeo = new THREE.BoxGeometry(2, 2, 14);
+            const armMesh = new THREE.Mesh(armGeo, matDarkMetal);
+            armMesh.position.z = 10;
+            armMesh.castShadow = true;
+            armMesh.receiveShadow = true;
+            armMesh.userData = {
+                name: `C-${i+1} 舰船对接机库 (Docking Bay C-${i+1})`,
+                desc: "标准星际穿梭机与货运舰船停泊通道，配有电磁牵引力场与气闸密封门。",
+                power: "91.2%",
+                temp: "288 K"
+            };
+            armGroup.add(armMesh);
+            interactiveObjects.push(armMesh);
+
+            // Docking Cylinder Cap
+            const capGeo = new THREE.CylinderGeometry(2.2, 2.2, 3, 16);
+            const capMesh = new THREE.Mesh(capGeo, matMagentaGlow);
+            capMesh.rotation.x = Math.PI / 2;
+            capMesh.position.z = 17;
+            armGroup.add(capMesh);
+
+            stationGroup.add(armGroup);
+        }
+
+        // 5.4 Solar Panels & Power Wings
+        for (let i = 0; i < 2; i++) {
+            const wingGroup = new THREE.Group();
+            wingGroup.rotation.y = i * Math.PI;
+
+            // Boom
+            const boomGeo = new THREE.CylinderGeometry(0.5, 0.5, 28, 12);
+            const boom = new THREE.Mesh(boomGeo, matDarkMetal);
+            boom.rotation.z = Math.PI / 2;
+            boom.position.x = 22;
+            wingGroup.add(boom);
+
+            // Panels Array
+            for (let j = -3; j <= 3; j++) {
+                const panelGeo = new THREE.BoxGeometry(6, 0.2, 10);
+                const panel = new THREE.Mesh(panelGeo, matSolarPanel);
+                panel.position.set(12 + j * 4.5, 0, 0);
+                panel.castShadow = true;
+                panel.receiveShadow = true;
+                panel.userData = {
+                    name: "光子太阳能矩阵 (Photovoltaic Solar Wing)",
+                    desc: "高效吸收恒星辐射并转化为空间站运转电能的高纯度硅晶阵列。",
+                    power: "97.1%",
+                    temp: "340 K"
+                };
+                wingGroup.add(panel);
+                interactiveObjects.push(panel);
+            }
+
+            stationGroup.add(wingGroup);
+        }
+
+        // 5.5 Core Photon Jet Particle Stream (Vertical Exhaust)
+        const jetParticleCount = 400;
+        const jetGeo = new THREE.BufferGeometry();
+        const jetPositions = new Float32Array(jetParticleCount * 3);
+        const jetSpeeds = new Float32Array(jetParticleCount);
+
+        for (let i = 0; i < jetParticleCount * 3; i += 3) {
+            jetPositions[i] = (Math.random() - 0.5) * 3;
+            jetPositions[i + 1] = -15 - Math.random() * 25;
+            jetPositions[i + 2] = (Math.random() - 0.5) * 3;
+            jetSpeeds[i / 3] = 20 + Math.random() * 30;
+        }
+
+        jetGeo.setAttribute('position', new THREE.BufferAttribute(jetPositions, 3));
+        const jetMat = new THREE.PointsMaterial({
+            color: 0x00ffff,
+            size: 0.8,
+            transparent: true,
+            opacity: 0.9,
+            blending: THREE.AdditiveBlending
+        });
+        const jetParticles = new THREE.Points(jetGeo, jetMat);
+        stationGroup.add(jetParticles);
+
+        // 5.6 Outer Guard Satellites & Asteroid Debris Field
+        const satelliteGroup = new THREE.Group();
+        scene.add(satelliteGroup);
+
+        const satellites = [];
+        for (let i = 0; i < 5; i++) {
+            const satAngle = (i / 5) * Math.PI * 2;
+            const satDist = 45 + Math.random() * 15;
+            const satHeight = (Math.random() - 0.5) * 20;
+
+            const satContainer = new THREE.Group();
+            satContainer.position.set(Math.cos(satAngle) * satDist, satHeight, Math.sin(satAngle) * satDist);
+
+            const satBodyGeo = new THREE.BoxGeometry(2, 2, 4);
+            const satBody = new THREE.Mesh(satBodyGeo, matLightMetal);
+            satBody.castShadow = true;
+            satBody.userData = {
+                name: `护卫侦测卫星 S-${i+1} (Scout Satellite S-${i+1})`,
+                desc: "自主巡航防御与空间雷达探测哨兵，装备有微型离子推进器。",
+                power: "99.0%",
+                temp: "250 K"
+            };
+            satContainer.add(satBody);
+            interactiveObjects.push(satBody);
+
+            // Solar wings on satellite
+            const satWing1 = new THREE.Mesh(new THREE.BoxGeometry(6, 0.1, 1.5), matSolarPanel);
+            satWing1.position.x = 3.5;
+            satContainer.add(satWing1);
+            const satWing2 = new THREE.Mesh(new THREE.BoxGeometry(6, 0.1, 1.5), matSolarPanel);
+            satWing2.position.x = -3.5;
+            satContainer.add(satWing2);
+
+            satelliteGroup.add(satContainer);
+            satellites.push({ group: satContainer, angle: satAngle, dist: satDist, speed: 0.2 + Math.random() * 0.3 });
+        }
+
+        // Asteroid Debris Ring
+        const asteroidGroup = new THREE.Group();
+        scene.add(asteroidGroup);
+        const asteroidGeo = new THREE.DodecahedronGeometry(1, 1);
+
+        for (let i = 0; i < 40; i++) {
+            const astAngle = Math.random() * Math.PI * 2;
+            const astDist = 70 + Math.random() * 40;
+            const astHeight = (Math.random() - 0.5) * 30;
+
+            const scale = 0.8 + Math.random() * 2.5;
+            const asteroid = new THREE.Mesh(asteroidGeo, matDarkMetal);
+            asteroid.position.set(Math.cos(astAngle) * astDist, astHeight, Math.sin(astAngle) * astDist);
+            asteroid.scale.set(scale, scale * (0.6 + Math.random() * 0.8), scale);
+            asteroid.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, 0);
+            asteroid.castShadow = true;
+            asteroid.receiveShadow = true;
+            asteroidGroup.add(asteroid);
+        }
+
+        // --- 6. Raycasting & Interactive Hover ---
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2(-999, -999);
+        let hoveredObject = null;
+        let originalMaterial = null;
+
+        const highlightMaterial = new THREE.MeshStandardMaterial({
+            color: 0x00ffff,
+            emissive: 0x00ffff,
+            emissiveIntensity: 0.6,
+            metalness: 0.9,
+            roughness: 0.2
+        });
+
+        window.addEventListener('mousemove', (event) => {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        });
+
+        // Hide Loader once ready
+        setTimeout(() => {
+            const loader = document.getElementById('loader');
+            loader.style.opacity = '0';
+            setTimeout(() => loader.remove(), 800);
+        }, 600);
+
+        // --- 7. Animation Loop with Delta Clock ---
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const delta = clock.getDelta();
+            const elapsedTime = clock.getElapsedTime();
+
+            // 1. Station subtle floating
+            stationGroup.position.y = Math.sin(elapsedTime * 1.2) * 1.2;
+            stationGroup.rotation.y = elapsedTime * 0.05;
+
+            // 2. Counter-rotating rings
+            ringGroup1.rotation.y += delta * 0.25;
+            ringGroup2.rotation.y -= delta * 0.35;
+
+            // 3. Orbiting satellites
+            satellites.forEach(sat => {
+                sat.angle += sat.speed * delta * 0.2;
+                sat.group.position.x = Math.cos(sat.angle) * sat.dist;
+                sat.group.position.z = Math.sin(sat.angle) * sat.dist;
+                sat.group.rotation.y = -sat.angle;
+            });
+
+            // 4. Background starfield slow rotation
+            starField.rotation.y = elapsedTime * 0.01;
+            asteroidGroup.rotation.y = elapsedTime * 0.02;
+
+            // 5. Photon Jet particle stream animation
+            const jetPosArr = jetGeo.attributes.position.array;
+            for (let i = 0; i < jetParticleCount; i++) {
+                jetPosArr[i * 3 + 1] -= delta * 25;
+                if (jetPosArr[i * 3 + 1] < -45) {
+                    jetPosArr[i * 3 + 1] = -15;
+                }
+            }
+            jetGeo.attributes.position.needsUpdate = true;
+
+            // 6. Raycaster Intersection Check
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(interactiveObjects, true);
+
+            if (intersects.length > 0) {
+                let hitObj = intersects[0].object;
+                // Find top parent in interactive list if needed
+                while (hitObj && !interactiveObjects.includes(hitObj) && hitObj.parent) {
+                    hitObj = hitObj.parent;
+                }
+
+                if (hitObj && hitObj.userData && hitObj.userData.name) {
+                    if (hoveredObject !== hitObj) {
+                        if (hoveredObject && originalMaterial) {
+                            hoveredObject.material = originalMaterial;
+                        }
+                        hoveredObject = hitObj;
+                        originalMaterial = hitObj.material;
+                        hitObj.material = highlightMaterial;
+
+                        // Update HUD UI
+                        document.getElementById('hud-name').innerText = hitObj.userData.name;
+                        document.getElementById('hud-desc').innerText = hitObj.userData.desc;
+                        document.getElementById('hud-power').innerText = hitObj.userData.power;
+                        document.getElementById('hud-progress').style.width = hitObj.userData.power;
+                        document.getElementById('hud-temp').innerText = hitObj.userData.temp;
+                        document.getElementById('hud-container').style.borderColor = '#ff00ff';
+                    }
+                }
+            } else {
+                if (hoveredObject) {
+                    if (originalMaterial) {
+                        hoveredObject.material = originalMaterial;
+                    }
+                    hoveredObject = null;
+                    originalMaterial = null;
+
+                    // Reset HUD UI to Default
+                    document.getElementById('hud-name').innerText = "NEXUS PRIME ORBITAL";
+                    document.getElementById('hud-desc').innerText = "Multi-tier modular space station operating in low Earth cyberpunk orbit. Hover over modules for diagnostics.";
+                    document.getElementById('hud-power').innerText = "98.4%";
+                    document.getElementById('hud-progress').style.width = "98.4%";
+                    document.getElementById('hud-temp').innerText = "1,420 K";
+                    document.getElementById('hud-container').style.borderColor = "rgba(0, 255, 255, 0.4)";
+                }
+            }
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        animate();
+
+        // --- 8. Window Resize Response ---
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>

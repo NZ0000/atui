@@ -19,18 +19,18 @@ except ImportError:
 
 TOOL_SPEC = {
     "name": "test_runner",
-    "description": "Run Python syntax validation, py_compile checks, and test runner (pytest/unittest). Returns structured results and errors.",
+    "description": "Run syntax validation (Python AST/py_compile, HTML/CSS/JS web validation) and test suites (pytest/unittest). Returns structured test reports and errors.",
     "parameters": {
         "type": "object",
         "properties": {
             "target": {
                 "type": "string",
-                "description": "File or directory path to test or check."
+                "description": "File or directory path to test or check (.py, .html, .css, .js or folder)."
             },
             "mode": {
                 "type": "string",
-                "enum": ["all", "syntax", "pytest", "unittest"],
-                "description": "Testing mode: 'all' (default, syntax check + test run), 'syntax', 'pytest', or 'unittest'."
+                "enum": ["all", "syntax", "web", "pytest", "unittest"],
+                "description": "Testing mode: 'all' (default), 'syntax' (Python syntax), 'web' (HTML/CSS/JS syntax), 'pytest', or 'unittest'."
             },
             "cwd": {
                 "type": "string",
@@ -86,6 +86,16 @@ def check_syntax(path: str) -> List[Dict[str, Any]]:
 
 def run_tests(target: str, mode: str = "all", cwd: Optional[str] = None) -> Dict[str, Any]:
     working_dir = os.path.abspath(cwd) if cwd else os.getcwd()
+    target_abs = target if os.path.isabs(target) else os.path.join(working_dir, target)
+
+    # Web files validation hook
+    if mode == "web" or (isinstance(target, str) and target.endswith((".html", ".htm", ".css", ".js", ".mjs"))):
+        try:
+            from tools.web_validator import validate_target
+        except ImportError:
+            from web_validator import validate_target
+        return validate_target(target_abs)
+
     syntax_errors = []
 
     # 1. Syntax check first

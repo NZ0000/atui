@@ -35,7 +35,10 @@ from api.service import (
     run_pipeline_workflow,
     list_available_agents,
     list_available_tools,
-    execute_tool_api
+    execute_tool_api,
+    run_tools_batch,
+    validate_web_code,
+    test_browser_page
 )
 from ui.terminal import run_interactive_session, render_markdown, format_event_for_human
 
@@ -43,6 +46,9 @@ from ui.terminal import run_interactive_session, render_markdown, format_event_f
 run_agent = run_single_agent
 run_pipeline = run_pipeline_workflow
 run_tool = execute_tool_api
+run_batch = run_tools_batch
+validate_web = validate_web_code
+test_browser = test_browser_page
 
 def _format_event_printer(event: Event):
     """Console printer for CLI feedback."""

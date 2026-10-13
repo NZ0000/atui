@@ -12,6 +12,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from core.project import manage_project, get_current_project, switch_project, ProjectContext
 
 class TestProjectContext(unittest.TestCase):
+    def setUp(self):
+        self.repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        switch_project(self.repo_root)
+
     def test_current_project_detects_rules(self):
         ctx = get_current_project()
         self.assertTrue(os.path.exists(ctx.path))
