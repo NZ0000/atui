@@ -98,60 +98,110 @@ class ConcurrentModularPipeline:
         planner_harness = AgentHarness(planner_role, model=active_model)
 
         plan_output = "deliverables/plan.md"
-        planner_task = (
-            f"目标任务：{task}\n"
-            f"请作为总架构师（Principal Architect），针对此大型复合 3D 场景/工程进行【模块化领域解耦设计】。\n"
-            f"必须拆解为 4 个互相独立、可复用、高内聚的子组件模块（例如放置于 `modules/` 目录下）：\n"
-            f"1. 地形地貌与基底 (terrain.js)\n"
-            f"2. 建筑群与民居结构 (buildings.js，支持复合造型或外部模型实例化排布)\n"
-            f"3. 植被生态与森林 (vegetation.js，强制使用 THREE.InstancedMesh 批量实例化高效渲染)\n"
-            f"4. 道具路灯与发光信标 (props.js，带点光源与 Bloom 自发光)\n\n"
-            f"并且为每个模块定义明确的 ES6 导出类/接口契约（如 `addTo(scene)`, `update(delta)`, `dispose()`）。\n"
-            f"设计针对各个组件的原子化测试用例（如 tests/ 目录下的独立单测文件）。\n"
-            f"生成全流程燃尽验收清单至：`deliverables/acceptance_criteria.md`，并将总体架构蓝图写入：{plan_output}"
-        )
-        plan_res = planner_harness.run(planner_task, output_file=plan_output)
-        stage_records.append({"stage": "planning", "result": plan_res})
+        is_natural = any(w in task for w in ["自然", "真实", "不虚构", "写实", "湖泊", "湖畔", "森林", "乡村", "庄园", "木屋", "田园", "realistic", "natural"])
 
-        # Define Default Module Decomposition Specifications
-        module_specs = [
-            {
-                "id": "MOD-1",
-                "name": "terrain",
-                "title": "地形与地貌基底组件 (Terrain Module)",
-                "file": "modules/terrain.js",
-                "test_file": "tests/test_terrain.py",
-                "contract": "导出一个包含 constructor(scene, options)、addTo(scene)、update(delta) 的 Terrain 类。创建起伏科幻地貌、网格路径及材质。",
-                "requirements": "严禁裸立方体，使用起伏网格与微观质感贴图，接收阴影。"
-            },
-            {
-                "id": "MOD-2",
-                "name": "buildings",
-                "title": "未来聚落建筑集群组件 (Buildings Module)",
-                "file": "modules/buildings.js",
-                "test_file": "tests/test_buildings.py",
-                "contract": "导出一个包含 constructor(scene, count)、createBuildingCluster(gridCoords)、addTo(scene) 的 Buildings 类。支持多样化未来房屋结构与高低排布。",
-                "requirements": "复合几何体造型与金属 PBR 物理材质，门窗自发光，投射与接收阴影。"
-            },
-            {
-                "id": "MOD-3",
-                "name": "vegetation",
-                "title": "生态植被与异星森林组件 (Vegetation Module)",
-                "file": "modules/vegetation.js",
-                "test_file": "tests/test_vegetation.py",
-                "contract": "导出一个包含 constructor(scene, count)、addTo(scene)、update(delta) 的 Vegetation 类。强制使用 THREE.InstancedMesh 批量实例化渲染数百棵树木或植被。",
-                "requirements": "必须使用 THREE.InstancedMesh 单次 Draw Call 批量高效渲染，具备随机缩放与微旋转，保证 60FPS。"
-            },
-            {
-                "id": "MOD-4",
-                "name": "props",
-                "title": "环境道具与全息路灯组件 (Props Module)",
-                "file": "modules/props.js",
-                "test_file": "tests/test_props.py",
-                "contract": "导出一个包含 constructor(scene)、addTo(scene)、update(delta) 的 Props 类。生成发光全息路灯、能量柱与交互信标。",
-                "requirements": "部件配置 emissive 自发光与点光源 (PointLight)，产生光学光晕，为街道提供夜间冷暖对比氛围。"
-            }
-        ]
+        if is_natural:
+            planner_task = (
+                f"目标任务：{task}\n"
+                f"请作为总架构师（Principal Architect），针对此大型自然写实 3D 大场景进行【模块化领域解耦设计】。\n"
+                f"必须拆解为 4 个互相独立、可复用、高内聚的子组件模块（放置于 `modules/` 目录下）：\n"
+                f"1. 自然起伏地形与高山湖泊水体 (terrain.js)\n"
+                f"2. 田园度假木屋与庄园建筑群 (buildings.js，导入 cottage.glb 与木质露台排布)\n"
+                f"3. 真实针阔混交森林与高密度植被 (vegetation.js，强制使用 THREE.InstancedMesh 批量实例化高效渲染)\n"
+                f"4. 湖畔亲水码头与生活生态道具 (props.js，包含木码头、木船、野营石圈及漫步小猫 catv2.glb)\n\n"
+                f"并且为每个模块定义明确的 ES6 导出类/接口契约（如 `addTo(scene)`, `update(delta)`, `dispose()`）。\n"
+                f"设计针对各个组件的原子化测试用例（如 tests/ 目录下的独立单测文件）。\n"
+                f"生成全流程燃尽验收清单至：`deliverables/acceptance_criteria.md`，并将总体架构蓝图写入：{plan_output}"
+            )
+            module_specs = [
+                {
+                    "id": "MOD-1",
+                    "name": "terrain",
+                    "title": "自然起伏地形与高山湖泊组件 (Natural Terrain & Lake Module)",
+                    "file": "modules/terrain.js",
+                    "test_file": "tests/test_terrain.py",
+                    "contract": "导出一个包含 constructor(scene, options)、addTo(scene)、update(delta) 的 Terrain 类。构建自然起伏草地山丘、泥土小径与具备柔和水波荡漾的清澈湖泊水体。",
+                    "requirements": "严禁裸立方体。使用起伏高密度网格与自然草地/泥土 PBR 贴图、反射水体材质（带微风波纹与菲涅尔水面高光反射），接收柔和自然阴影。"
+                },
+                {
+                    "id": "MOD-2",
+                    "name": "buildings",
+                    "title": "乡村度假木屋与田园庄园建筑组件 (Chalet & Architecture Module)",
+                    "file": "modules/buildings.js",
+                    "test_file": "tests/test_buildings.py",
+                    "contract": "导出一个包含 constructor(scene, options)、addTo(scene)、update(delta) 的 Buildings 类。导入高精度欧洲原木度假木屋 (cottage.glb)，并布设湖畔露台、木栅栏与石砌基底。",
+                    "requirements": "写实原木纹理与石砌烟囱质感、物理遮光与漫反射，支持真实尺寸比例，与地形自然结合嵌入。"
+                },
+                {
+                    "id": "MOD-3",
+                    "name": "vegetation",
+                    "title": "真实针阔混交森林与高密度植被组件 (Foliage & Forest Module)",
+                    "file": "modules/vegetation.js",
+                    "test_file": "tests/test_vegetation.py",
+                    "contract": "导出一个包含 constructor(scene, count)、addTo(scene)、update(delta) 的 Vegetation 类。强制使用 THREE.InstancedMesh 批量实例化渲染 500+ 棵自然松针树、高山冷杉、阔叶白桦与野生灌木花草。",
+                    "requirements": "必须使用 THREE.InstancedMesh 单次 Draw Call 批量高效渲染，具备自然随机高低粗细缩放、微小色相明暗随机扰动，保证 60FPS。"
+                },
+                {
+                    "id": "MOD-4",
+                    "name": "props",
+                    "title": "湖畔生活道具与码头休闲生态组件 (Lakeside Props Module)",
+                    "file": "modules/props.js",
+                    "test_file": "tests/test_props.py",
+                    "contract": "导出一个包含 constructor(scene)、addTo(scene)、update(delta) 的 Props 类。生成木质亲水码头、停泊的小木船、营火石圈、木质长椅与漫步小猫 (catv2.glb)。"
+                    ,"requirements": "真实木纹、金属与石材质感，营造静谧恬淡的自然乡村生活氛围，拒绝刺眼不合时宜的霓虹光。"
+                }
+            ]
+        else:
+            planner_task = (
+                f"目标任务：{task}\n"
+                f"请作为总架构师（Principal Architect），针对此大型复合 3D 场景/工程进行【模块化领域解耦设计】。\n"
+                f"必须拆解为 4 个互相独立、可复用、高内聚的子组件模块（例如放置于 `modules/` 目录下）：\n"
+                f"1. 地形地貌与基底 (terrain.js)\n"
+                f"2. 建筑群与民居结构 (buildings.js，支持复合造型或外部模型实例化排布)\n"
+                f"3. 植被生态与森林 (vegetation.js，强制使用 THREE.InstancedMesh 批量实例化高效渲染)\n"
+                f"4. 道具路灯与发光信标 (props.js，带点光源与 Bloom 自发光)\n\n"
+                f"并且为每个模块定义明确的 ES6 导出类/接口契约（如 `addTo(scene)`, `update(delta)`, `dispose()`）。\n"
+                f"设计针对各个组件的原子化测试用例（如 tests/ 目录下的独立单测文件）。\n"
+                f"生成全流程燃尽验收清单至：`deliverables/acceptance_criteria.md`，并将总体架构蓝图写入：{plan_output}"
+            )
+            module_specs = [
+                {
+                    "id": "MOD-1",
+                    "name": "terrain",
+                    "title": "地形与地貌基底组件 (Terrain Module)",
+                    "file": "modules/terrain.js",
+                    "test_file": "tests/test_terrain.py",
+                    "contract": "导出一个包含 constructor(scene, options)、addTo(scene)、update(delta) 的 Terrain 类。创建起伏科幻地貌、网格路径及材质。",
+                    "requirements": "严禁裸立方体，使用起伏网格与微观质感贴图，接收阴影。"
+                },
+                {
+                    "id": "MOD-2",
+                    "name": "buildings",
+                    "title": "未来聚落建筑集群组件 (Buildings Module)",
+                    "file": "modules/buildings.js",
+                    "test_file": "tests/test_buildings.py",
+                    "contract": "导出一个包含 constructor(scene, count)、createBuildingCluster(gridCoords)、addTo(scene) 的 Buildings 类。支持多样化未来房屋结构与高低排布。",
+                    "requirements": "复合几何体造型与金属 PBR 物理材质，门窗自发光，投射与接收阴影。"
+                },
+                {
+                    "id": "MOD-3",
+                    "name": "vegetation",
+                    "title": "生态植被与异星森林组件 (Vegetation Module)",
+                    "file": "modules/vegetation.js",
+                    "test_file": "tests/test_vegetation.py",
+                    "contract": "导出一个包含 constructor(scene, count)、addTo(scene)、update(delta) 的 Vegetation 类。强制使用 THREE.InstancedMesh 批量实例化渲染数百棵树木或植被。",
+                    "requirements": "必须使用 THREE.InstancedMesh 单次 Draw Call 批量高效渲染，具备随机缩放与微旋转，保证 60FPS。"
+                },
+                {
+                    "id": "MOD-4",
+                    "name": "props",
+                    "title": "环境道具与全息路灯组件 (Props Module)",
+                    "file": "modules/props.js",
+                    "test_file": "tests/test_props.py",
+                    "contract": "导出一个包含 constructor(scene)、addTo(scene)、update(delta) 的 Props 类。生成发光全息路灯、能量柱与交互信标。",
+                    "requirements": "部件配置 emissive 自发光与点光源 (PointLight)，产生光学光晕，为街道提供夜间冷暖对比氛围。"
+                }
+            ]
 
         # Ensure acceptance checklist is present
         cl_path = os.path.join(proj.path, "deliverables", "acceptance_criteria.md")
@@ -223,17 +273,32 @@ class ConcurrentModularPipeline:
         integrator_harness = AgentHarness(coder_role, model=active_model)
 
         integration_output = "deliverables/integration_changes.md"
-        integrator_task = (
-            f"目标任务：完成复合大场景的集成总装配。\n"
-            f"各个独立子模块已由并发 Agent 编写并验证完毕（位于 modules/ 目录下：terrain.js, buildings.js, vegetation.js, props.js）。\n"
-            f"现在请编写或更新项目总入口 `index.html` 以及总控脚本，完成总装：\n"
-            f"1. 在主脚本中以 ES6 模块导入所有子组件类（Terrain, Buildings, Vegetation, Props）；\n"
-            f"2. 初始化透视相机、轨道控制器 (OrbitControls)、RoomEnvironment 摄影棚环境反射及阴影平行光；\n"
-            f"3. 实例化所有子组件并挂载到场景中，合理布设空间坐标（中央广场、居住区、周边植被森林、发光街灯）；\n"
-            f"4. 配置硬件 4x MSAA 抗锯齿与电影级后期辉光；\n"
-            f"5. 配备美观的 Sci-Fi HUD 交互面板（支持昼夜光照切换、线框模式、各组件可见性开关与巡航视角）。\n"
-            f"将完成的代码写入 `index.html`，并将集成说明写入：{integration_output}"
-        )
+        if is_natural:
+            integrator_task = (
+                f"目标任务：完成自然写实高山湖畔庄园复合大场景的集成总装配。\n"
+                f"各个独立子模块已由并发 Agent 编写并验证完毕（位于 modules/ 目录下：terrain.js, buildings.js, vegetation.js, props.js）。\n"
+                f"现在请编写或更新项目总入口 `index.html` 以及 `index.js`，完成总装：\n"
+                f"1. 在主脚本中以 ES6 模块导入所有子组件类（Terrain, Buildings, Vegetation, Props）；\n"
+                f"2. 配置真实自然日光照明：透视相机、轨道控制器 (OrbitControls)、45度自然平行日光 (带高品质柔和接触阴影)、真实天空环境光 (Sky / RoomEnvironment)；\n"
+                f"3. 实例化所有子组件并挂载到场景中，合理布设自然空间坐标（湖泊波光粼粼、木屋庄园坐落湖畔草坡、松针与白桦密林环抱山麓、码头停泊小船与漫步小猫）；\n"
+                f"4. 配置硬件 4x MSAA 抗锯齿与自然色调映射 (ACESFilmicToneMapping，呈现明媚自然日光质感，拒绝塑料感或死黑)；\n"
+                f"5. 配备美观现代的高端自然庄园 HUD 交互面板（支持日光时间段切换、各景观组件可见性、湖畔码头/木屋特写导览视角）。\n"
+                f"确保在 index.html 中正确配置 importmap 映射本地 vendor (three: ./vendor/three.module.js, three/addons/: ./vendor/addons/)，避免相对路径 404。\n"
+                f"将完成的代码写入 `index.html` 与 `index.js`，并将集成说明写入：{integration_output}"
+            )
+        else:
+            integrator_task = (
+                f"目标任务：完成复合大场景的集成总装配。\n"
+                f"各个独立子模块已由并发 Agent 编写并验证完毕（位于 modules/ 目录下：terrain.js, buildings.js, vegetation.js, props.js）。\n"
+                f"现在请编写或更新项目总入口 `index.html` 以及总控脚本，完成总装：\n"
+                f"1. 在主脚本中以 ES6 模块导入所有子组件类（Terrain, Buildings, Vegetation, Props）；\n"
+                f"2. 初始化透视相机、轨道控制器 (OrbitControls)、RoomEnvironment 摄影棚环境反射及阴影平行光；\n"
+                f"3. 实例化所有子组件并挂载到场景中，合理布设空间坐标（中央广场、居住区、周边植被森林、发光街灯）；\n"
+                f"4. 配置硬件 4x MSAA 抗锯齿与电影级后期辉光；\n"
+                f"5. 配备美观的 Sci-Fi HUD 交互面板（支持昼夜光照切换、线框模式、各组件可见性开关与巡航视角）。\n"
+                f"确保在 index.html 中正确配置 importmap 映射本地 vendor (three: ./vendor/three.module.js, three/addons/: ./vendor/addons/)。\n"
+                f"将完成的代码写入 `index.html`，并将集成说明写入：{integration_output}"
+            )
         integration_res = integrator_harness.run(integrator_task, output_file=integration_output)
         stage_records.append({"stage": "integration_assembly", "result": integration_res})
 
