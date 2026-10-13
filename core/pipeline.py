@@ -55,6 +55,7 @@ class PipelineOrchestrator:
         proj = get_current_project()
         stale_files = [
             "deliverables/code_changes.md",
+            "deliverables/code_review.md",
             "deliverables/test_report.md",
             "deliverables/design_audit.md",
             "deliverables/acceptance_criteria.md",
@@ -145,6 +146,26 @@ class PipelineOrchestrator:
                 "error": code_res.get("error", "Coder failed to satisfy output gate."),
                 "stage_records": stage_records
             }
+
+        # Stage 2.5: Static Diff & Code Mental Simulation Review (Reviewer)
+        try:
+            reviewer_path = self._get_agent_path("reviewer")
+            default_bus.publish(EventType.PIPELINE_STEP, {"stage": "code_review", "role": "reviewer"})
+            reviewer_role = Role.from_file(reviewer_path)
+            reviewer_harness = AgentHarness(reviewer_role, model=active_model)
+            review_output = "deliverables/code_review.md"
+            reviewer_task = (
+                f"任务目标：{task}\n"
+                f"Coder 已完成代码修改。请使用 code_reviewer 工具提取 Git Diff 差量修改并进行静态分析：\n"
+                f"1. 脑海中单步心智推演代码执行，严查变量暂时死区 (TDZ ReferenceError) 与未定义先调用；\n"
+                f"2. 若涉及 Three.js/3D，静态审查 EffectComposer 是否显式配置 samples: 4 硬件抗锯齿，材质是否配置 RoomEnvironment 环境反射，模型是否配置 computeVertexNormals 平滑法线；\n"
+                f"3. 严打测试篡改（严禁跳过或篡改 tests/ 断言）；\n"
+                f"首行必须明确标记为【审查结果：PASS】或【审查结果：REJECT 驳回】，输出结构化审查报告至：{review_output}"
+            )
+            review_res = reviewer_harness.run(reviewer_task, output_file=review_output)
+            stage_records.append({"stage": "code_review", "result": review_res})
+        except FileNotFoundError:
+            pass
 
         # Stage 3: Testing Loop
         default_bus.publish(EventType.PIPELINE_STEP, {"stage": "testing_loop", "role": "tester"})
@@ -238,6 +259,20 @@ class PipelineOrchestrator:
                             except Exception:
                                 pass
                         
+                        # 3. Check Code Reviewer audit report
+                        code_review_path = os.path.join(proj.path, "deliverables", "code_review.md")
+                        if os.path.exists(code_review_path):
+                            try:
+                                with open(code_review_path, "r", encoding="utf-8") as rf:
+                                    r_content = rf.read()
+                                r_reject_keywords = ["驳回", "reject", "不合格", "未达标", "违规", "篡改", "死区", "狗牙"]
+                                is_cr_rejected = any(kw in r_content.lower() for kw in r_reject_keywords)
+                                if is_cr_rejected:
+                                    verif["passed"] = False
+                                    verif["error_details"] = f"代码审查与静态心智推演未通过：\n{r_content[:300]}"
+                            except Exception:
+                                pass
+
                         # Save updated checklist back to disk
                         cl.save_to_file(cl_path)
 
