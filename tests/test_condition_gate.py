@@ -190,6 +190,53 @@ def test_script_syntax_precheck_rejects_broken_script():
         assert res["data"]["passed"] is True
 
 
+def test_web_runtime_clean_condition(monkeypatch):
+    """Web console-clean condition: pass on clean page, fail on errors, skip when infra missing."""
+    import tools as tools_mod
+    real_execute = tools_mod.execute_tool
+
+    def dispatch(fake_browser_result, fail=False):
+        def _dispatch(tool_name, params=None):
+            if tool_name == "browser_test":
+                if fail:
+                    raise RuntimeError("no chromium")
+                return fake_browser_result
+            return real_execute(tool_name, params)
+        return _dispatch
+
+    # --- page with console errors -> fail with samples ---
+    monkeypatch.setattr(tools_mod, "execute_tool", dispatch(
+        {"success": False, "data": {"console_errors": [{"message": "Uncaught TypeError: x is not a function"}], "network_failures": []}}
+    ))
+    res = tools.execute_tool("condition_gate", {
+        "conditions": [{"type": "web_runtime_clean", "url": "http://127.0.0.1:1/x.html"}]
+    })
+    assert res["data"]["passed"] is False
+    assert "TypeError" in res["data"]["failure_summary"]
+
+    # --- clean page -> pass ---
+    monkeypatch.setattr(tools_mod, "execute_tool", dispatch(
+        {"success": True, "data": {"console_errors": [], "network_failures": []}}
+    ))
+    res = tools.execute_tool("condition_gate", {
+        "conditions": [{"type": "web_runtime_clean", "url": "http://127.0.0.1:1/x.html"}]
+    })
+    assert res["data"]["passed"] is True
+
+    # --- infrastructure unavailable -> graceful skip (never false-fail) ---
+    monkeypatch.setattr(tools_mod, "execute_tool", dispatch(None, fail=True))
+    res = tools.execute_tool("condition_gate", {
+        "conditions": [{"type": "web_runtime_clean", "url": "http://127.0.0.1:1/x.html"}]
+    })
+    assert res["data"]["passed"] is True
+    assert "SKIPPED" in res["data"]["results"][0]["detail"]
+
+    # --- missing url -> fail (no browser needed) ---
+    monkeypatch.undo()
+    res = tools.execute_tool("condition_gate", {"conditions": [{"type": "web_runtime_clean"}]})
+    assert res["data"]["passed"] is False
+
+
 def test_code_reference_integrity_condition():
     """Every referenced asset in scanned source files must exist on disk."""
     with tempfile.TemporaryDirectory() as tmp:

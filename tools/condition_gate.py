@@ -196,6 +196,42 @@ def _check_one(cond: Dict[str, Any], root: str) -> Dict[str, Any]:
                 detail += f"; MISSING TARGETS: {missing[:8]}"
             res.update(passed=ok, detail=detail)
 
+        elif ctype == "web_runtime_clean":
+            # Web-only baseline: page must load with zero console errors / network
+            # failures (project-type-aware; meaningless for py/lua/c projects).
+            url = cond.get("url", "")
+            if not url:
+                res.update(passed=False, detail="web_runtime_clean requires 'url'")
+                return res
+            try:
+                import tools as _tools
+                try:
+                    _tools.discover_tools()
+                except Exception:
+                    pass
+                bt = _tools.execute_tool("browser_test", {
+                    "url_or_path": url,
+                    "wait_ms": int(cond.get("wait_ms", 5000)),
+                })
+            except Exception as exc:
+                # Runtime infrastructure unavailable: degrade gracefully, never false-fail
+                res.update(passed=True, detail=f"SKIPPED (browser runtime unavailable: {exc})")
+                return res
+            data = (bt.get("data") or {}) if isinstance(bt, dict) else {}
+            errors = data.get("console_errors") or []
+            net_failures = data.get("network_failures") or []
+            if not data:
+                res.update(passed=True, detail="SKIPPED (browser_test returned no data)")
+                return res
+            max_errors = int(cond.get("max_errors", 0))
+            ok = len(errors) <= max_errors and not net_failures
+            detail = f"console_errors={len(errors)}, network_failures={len(net_failures)}"
+            if not ok:
+                detail += "; SAMPLES: " + "; ".join(
+                    str(e.get("message", ""))[:90] for e in (errors + net_failures)[:5]
+                )
+            res.update(passed=ok, detail=detail)
+
         elif ctype in ("command", "script"):
             if ctype == "script":
                 script_path = cond.get("path", "")

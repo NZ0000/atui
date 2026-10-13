@@ -227,15 +227,33 @@ def test_acceptance_authority_helpers():
     assert spec3 and spec3["mode"] == "all"
 
     with tempfile.TemporaryDirectory() as tmp:
-        # --- baseline merge: auto-inject asset integrity when models/ exists ---
+        # --- profile detection ---
         os.makedirs(os.path.join(tmp, "models"))
-        merged = pipeline._merge_baseline_conditions({"mode": "all", "conditions": []}, tmp)
+        open(os.path.join(tmp, "index.html"), "w").close()
+        profile = pipeline._detect_project_profile(tmp)
+        assert profile["web"] is True and profile["python"] is False and profile["lua"] is False
+
+        # --- baseline merge is type-aware ---
+        merged = pipeline._merge_baseline_conditions({"mode": "all", "conditions": []}, tmp, "http://127.0.0.1:8088/index.html")
         types = [c["type"] for c in merged["conditions"]]
         assert "code_reference_integrity" in types
+        assert "web_runtime_clean" in types
+        assert merged["conditions"][-1]["url"] == "http://127.0.0.1:8088/index.html"
+        # web profile but no URL -> no runtime baseline
+        merged_no_url = pipeline._merge_baseline_conditions({"mode": "all", "conditions": []}, tmp, "")
+        assert "web_runtime_clean" not in [c["type"] for c in merged_no_url["conditions"]]
+        # non-web project -> console baseline never injected
+        with tempfile.TemporaryDirectory() as tmp_py:
+            open(os.path.join(tmp_py, "main.py"), "w").close()
+            merged_py = pipeline._merge_baseline_conditions(
+                {"mode": "all", "conditions": []}, tmp_py, "http://127.0.0.1:8088/x.html"
+            )
+            assert "web_runtime_clean" not in [c["type"] for c in merged_py["conditions"]]
         # no duplicate injection
-        merged2 = pipeline._merge_baseline_conditions(merged, tmp)
+        merged2 = pipeline._merge_baseline_conditions(merged, tmp, "http://127.0.0.1:8088/index.html")
         assert [c["type"] for c in merged2["conditions"]].count("code_reference_integrity") == 1
-        # no models dir -> no baseline
+        assert [c["type"] for c in merged2["conditions"]].count("web_runtime_clean") == 1
+        # no models dir -> no asset baseline
         with tempfile.TemporaryDirectory() as tmp2:
             merged3 = pipeline._merge_baseline_conditions({"mode": "all", "conditions": []}, tmp2)
             assert merged3["conditions"] == []

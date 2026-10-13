@@ -811,9 +811,11 @@ class ConcurrentModularPipeline:
                     f"迭代目标：{task}\n\n"
                     f"你是验收标准的制定者，不是执行者。请基于迭代目标制定一套机器可验证的硬性验收条件（condition_gate 规格）。\n"
                     f"可用条件类型：file_exists / file_count_min / file_size_min / content_contains / "
-                    f"text_search / code_reference_integrity / command / script。\n"
-                    f"要求：条件必须客观可判定、与任务硬指标一一对应、避免主观描述；若项目存在 models/ 资产目录，"
-                    f"必须包含资产引用完整性检查；不要包含无法在本机验证的条件。\n"
+                    f"text_search / code_reference_integrity / web_runtime_clean / command / script。\n"
+                    f"要求：条件必须客观可判定、与任务硬指标一一对应、避免主观描述；必须根据项目类型选择条件——"
+                    f"web/H5 项目才使用 web_runtime_clean（控制台零报错）与浏览器类验证，python/lua/c 项目改用 "
+                    f"command/script 类条件（如 pytest、luacheck、gcc 编译零警告），严禁给非 web 项目强加浏览器类条件；"
+                    f"若项目存在 models/ 资产目录，必须包含资产引用完整性检查；不要包含无法在本机验证的条件。\n"
                     f"输出格式：仅在报告中输出一个 ```json 代码块，内容为 {{\"mode\": \"all\", \"conditions\": [...]}} 规格，"
                     f"不要输出其它 JSON。"
                 )
@@ -830,8 +832,8 @@ class ConcurrentModularPipeline:
                     "stage": "conditions_draft_error", "error": str(exc)
                 })
         if gate_spec:
-            # Baselines are harness-owned and always merged; spec then pinned.
-            gate_spec = self._merge_baseline_conditions(gate_spec, proj.path)
+            # Baselines are harness-owned, type-aware and always merged; spec then pinned.
+            gate_spec = self._merge_baseline_conditions(gate_spec, proj.path, project_url)
             pinned_hash = self._pin_conditions(gate_spec, proj.path)
             default_bus.publish(EventType.PIPELINE_STEP, {
                 "stage": "conditions_pinned",
@@ -1160,14 +1162,41 @@ class ConcurrentModularPipeline:
         return ""
 
     @staticmethod
-    def _merge_baseline_conditions(gate_spec: Any, project_path: str) -> Dict[str, Any]:
-        """Auto-inject non-negotiable baseline conditions (harness-owned, not agent-authored)."""
+    def _detect_project_profile(project_path: str) -> Dict[str, bool]:
+        """
+        Detect the project's technical profile so baselines stay type-appropriate
+        (e.g. web console checks are meaningless for py/lua/c projects).
+        """
+        try:
+            names = os.listdir(project_path)
+        except Exception:
+            names = []
+
+        def _has(ext):
+            return any(n.endswith(ext) for n in names)
+
+        return {
+            "web": "index.html" in names or "package.json" in names,
+            "python": _has(".py"),
+            "lua": _has(".lua"),
+            "c": "Makefile" in names or "CMakeLists.txt" in names or _has(".c"),
+        }
+
+    @staticmethod
+    def _merge_baseline_conditions(
+        gate_spec: Any, project_path: str, project_url: str = ""
+    ) -> Dict[str, Any]:
+        """Auto-inject non-negotiable baseline conditions (harness-owned, not agent-authored).
+        Baselines are chosen by detected project type, never by agents."""
         spec = dict(gate_spec) if isinstance(gate_spec, dict) else {"mode": "all", "conditions": gate_spec}
         conds = spec.get("conditions")
         if isinstance(conds, dict):
             conds = [conds]
         conds = list(conds or [])
         existing_types = {c.get("type") for c in conds if isinstance(c, dict)}
+        profile = ConcurrentModularPipeline._detect_project_profile(project_path)
+
+        # Any project shipping a models/ asset dir: references must resolve on disk
         if os.path.isdir(os.path.join(project_path, "models")) and "code_reference_integrity" not in existing_types:
             conds.append({
                 "type": "code_reference_integrity",
@@ -1175,6 +1204,15 @@ class ConcurrentModularPipeline:
                 "ref_regex": r"models/[\w./-]+\.(?:glb|gltf)",
                 "min_refs": 1
             })
+
+        # Web projects with a live URL: zero console/network errors at runtime
+        if profile["web"] and project_url and "web_runtime_clean" not in existing_types:
+            conds.append({
+                "type": "web_runtime_clean",
+                "url": project_url,
+                "max_errors": 0
+            })
+
         spec["conditions"] = conds
         return spec
 
