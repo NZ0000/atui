@@ -2,25 +2,79 @@
 
 <p align="center">
   <b>天魁 (atui)</b> —— 命名取自三十六天罡之首“天魁星”，意为领袖群伦、统筹全局。<br>
-  英文名 <b>atui</b> (Autonomous Terminal User & Agent Harness)，是一个以<b>测试驱动开发 (TDD)</b> 为核心、具备<b>自我进化能力</b>的多角色自主终端智能体框架。
+  英文名 <b>atui</b> (Autonomous Terminal User & Agent Harness)，是一个以<b>测试驱动开发 (TDD)</b> 为核心、深度依托<b>强大的 Python 生态</b>、具备<b>真实自我进化能力</b>的多角色自主终端智能体框架。
 </p>
 
 ---
 
-## 🌟 核心特色
+## 🌟 核心特色与架构优势
 
-### 1. 类似 Claude Code 的极致终端交互体验 (TUI)
-- **告别臃肿的原始 JSON 堆砌**：摒弃机器调试式的全量报文输出，提供清晰优雅的终端视觉流。
+### 1. 深度依托强大的 Python 生态 (Powered by Python Ecosystem)
+Python 是全球 AI、数据科学、自动化与工程运维领域无可争议的通用语言，天魁 (atui) 充分汲取了 Python 生态的工程威力：
+- **动态内省与元编程能力 (Dynamic Metaprogramming & Introspection)**：
+  - 借助 Python 的 `ast` 抽象语法树分析、`importlib` 动态模块加载机制、`py_compile` 静态编译检查与运行时反射，天魁能够**在毫秒级动态加载、发现并热替换任何工具插件与代码模块**，为 Agent 自身的代码编写、自我修复与热重载提供了天然的运行环境。
+- **零外部强依赖的高便携底座 (Zero-Dependency Portability)**：
+  - 核心底层通信、进程调度、差异对比与测试驱动完全基于 Python 3 原生标准库（`urllib.request`, `subprocess`, `difflib`, `argparse`, `json`, `tempfile`），无任何冗余臃肿第三方依赖，跨平台（Linux、macOS、Windows）极速启动。
+- **无缝调度世界级工程工具链与科学计算库**：
+  - 测试驱动层直连 Python 顶级测试套件 `pytest` 与 `unittest`，支持异常捕获、Traceback 堆栈精准溯源与测试快照。
+  - Agent 具备无限拓展能力，可直接借助 `pip`/`venv` 无缝调用数据分析（NumPy、Pandas）、人工智能（PyTorch、HuggingFace、LangChain）、自动化采集（Playwright、Scrapy）等全球数以百万计的开源库。
+- **作为 Python 库被深度集成**：
+  - 支持 `from atui import run_agent, run_pipeline, switch_project`，可作为轻量级模块直接嵌入到现有 Python 后端、FastAPI 接口、桌面客户端或自动化 CI/CD 流水线中。
+
+---
+
+### 2. 独创的自进化闭环架构 (The Self-Evolution Architecture)
+
+> **“万物皆文本、皆文件、皆配置、皆命令行”** —— 这是天魁实现自主进化的哲学基石。
+> 智能体的提示词是 Markdown，工具是独立 Python 脚本，配置是 JSON/YAML，经验记忆是 Deliverables 文档。一切皆对智能体透明、可读、可审、可改！
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                   天魁 (atui) 五维闭环自进化机制 (Self-Evolution)          │
+└────────────────────────────────────────────────────────────────────────┘
+                                     │
+           1. 需求感知与架构规划 (Perception & Plan)
+           智能体感知缺失能力，检索模式，先期编写 TDD 测试契约 (RED)
+                                     ▼
+           2. 工具与代码自生成 (Tool Synthesis & Coding)
+           自主编写独立插件 tools/<new_tool>.py，实现功能逻辑
+                                     ▼
+           3. 自动化质量自验证 (Self-Verification Loop)
+           调用 test_runner 执行 AST 解析 + 全量 Pytest，5 轮内自修复
+                                     ▼
+           4. 能力版本自固化 (Self-Persistence & Git Commit)
+           测试全绿通过 TDD 门禁后，Git Agent 自动提交合并至版本库
+                                     ▼
+           5. 经验沉淀与规则反哺 (Precipitation & Rule Evolution)
+           Delivery 智能体梳理踩坑点与最佳实践，反哺优化后续 Agent 提示词与规则
+```
+
+#### 实机验证的自进化闭环案例：
+在实机运行中，系统接收到“扩展计算与统计分析能力”任务时：
+1. **Planner 智能体**自主分析工具注册表，在 [deliverables/plan.md](file:///home/xxx/atui_harness/deliverables/plan.md) 规划新工具设计，并**先期编写了覆盖 9 个用例的单元测试 [tests/test_calc.py](file:///home/xxx/atui_harness/tests/test_calc.py)**（处于 TDD 红灯态）；
+2. **Coder 智能体**根据测试要求，自主开发了符合插件标准的 [tools/calc.py](file:///home/xxx/atui_harness/tools/calc.py)；
+3. **Tester 智能体**启动全量回归测试，全部 28 个测试用例 100% 绿色通过；
+4. **Git Agent 智能体**通过 TDD 门禁，将新工具与测试用例自动执行 Git 提交（Commit: `84484e7`），将其永久固化为系统原生能力；
+5. **动态热插拔生效**：工具注册中心 [tools/\_\_init\_\_.py](file:///home/xxx/atui_harness/tools/__init__.py) 瞬间自动识别出新工具 `calc`，使得后续任何 Agent 均可直接调用此工具！
+
+---
+
+### 3. 类似 Claude Code 的极致交互式终端体验 (TUI)
+- **告别臃肿的原始 JSON 堆砌**：摒弃机器调试式的全量报文输出，提供清晰优雅的人性化终端视觉流。
 - **轻量化动作渲染**：以精简图标（`● ⚙️ [read]`、`✔ 执行成功`、`🧪 门禁通过`）实时追踪智能体思考、工具调用与测试进展。
 - **类 Claude Code REPL 交互**：自带彩色状态横幅、上下文提示符（`atui [master] ~/my-project ❯`），支持结构化 Markdown 输出渲染。
 - **原生 Slash 斜杠指令体系**：集成 `/cd`、`/project`、`/rules`、`/role`、`/model`、`/pipeline`、`/git`、`/test`、`/tools`、`/clear` 等高频快捷命令。
 
-### 2. 统一项目目录穿透与规则热注入 (Project Context & Rules Injection)
+---
+
+### 4. 统一项目目录穿透与规则热注入 (Project Context & Rules Injection)
 - **跨项目无缝工作**：无论 `atui` 部署在何处，均可通过统一接口 `/cd <项目路径>` 或 `switch_project(path)` 将当前工作区锁定在目标代码仓库。
 - **自动规则发现与注入**：自动检索目标项目根目录下的 `rule/rule.md`、`rule.md`、`AGENTS.md`、`CLAUDE.md` 等规则守则，将其动态注入到智能体 System Prompt，确保智能体严格遵循目标项目的工程规范与契约。
 - **会话持久化**：自动持久化当前激活项目路径至 `~/.atui_project_state.json`，随时打开即进入上次的工作上下文。
 
-### 3. 全生命周期多智能体流水线 (Multi-Agent Lifecycle Pipeline)
+---
+
+### 5. 全生命周期多智能体流水线 (Multi-Agent Lifecycle Pipeline)
 系统内置完备的五大角色智能体，协同完成复杂软件工程闭环：
 - 🧭 **规划与架构师 (Planner)**：头脑风暴、分析参考代码模式、提出功能方案，并**先期设计并编写 TDD 测试用例**。
 - 💻 **编码与重构工程师 (Coder)**：遵循测试用例与项目规则，执行最小化高内聚编码，消除红灯。
@@ -29,24 +83,23 @@
 - 📦 **收尾交付与知识沉淀 (Delivery)**：复盘全流程，梳理核心经验、踩坑要点（Gotchas）、使用指南并沉淀归档交付资产。
 - 🧠 **主调度大脑 (Orchestrator)**：统筹上述各子角色流转与状态协调。
 
-### 4. 严苛的 TDD 质量门禁与自修复闭环 (TDD Gate & Self-Repair)
+---
+
+### 6. 严苛的 TDD 质量门禁与自修复闭环 (TDD Gate & Self-Repair)
 - **无测试，不编码**：强制实行 TDD 先行，未编写对应测试用例禁止合并。
 - **双向自修复循环**：当 Tester 发现测试失败时，将失败堆栈与诊断信息精准反馈给 Coder，智能体在两者之间循环修复（默认上限 5 轮），直至测试全绿。
 - **后置回归与 Git 自动回退保护**：合并代码后重新执行全局回归测试；若有任何用例失败，立即调用 `git restore` / 回退操作，保护代码仓库绝对安全。
 
-### 5. 万物皆插件，万物皆接口 (Everything is a Plugin)
+---
+
+### 7. 万物皆插件，万物皆接口 (Everything is a Plugin)
 - 所有 Function Calling 工具均置于 `tools/` 目录，符合独立脚本规范。
 - **双模调用**：每个工具既可以被 Python 作为函数导入调用 (`execute(params)`)，也可以直接在终端通过 CLI 命令参数调用 (`python tools/read.py --path ...`)。
 - **即插即用**：放入新的 Python 脚本即可被注册中心自动发现与热加载。
 
-### 6. 自主进化能力 (Self-Evolution)
-- **万物皆文本、皆文件、皆配置、皆命令行**。
-- 提示词定义在 Markdown 文件中，工具是独立的 Python 脚本，配置在 JSON 中。
-- 智能体能够自主分析现有代码、编写自身的新工具插件（如实机自进化生成的 `tools/calc.py`）、为其编写测试、自测通过并提交 Git，实现工程能力的自迭代。
-
 ---
 
-### 7. 严格遵循全局规则守则 ([rule/rule.md](file:///home/xxx/atui_harness/rule/rule.md))
+### 8. 严格遵循全局规则守则 ([rule/rule.md](file:///home/xxx/atui_harness/rule/rule.md))
 - 1. 万物皆插件，万物皆接口，可调用
 - 2. 模块化，可复用，功能解耦
 - 3. 配置驱动，使用 md、json、yaml
@@ -83,7 +136,7 @@ atui_harness/
 │   ├── test_runner.py         # 质量检测：AST语法解析、py_compile、全量测试运行
 │   ├── git_tool.py            # 版本控制：status、diff、commit、log、rollback
 │   ├── inspect_ref.py         # 参考检索：深入搜索 ref/ 模式与架构
-│   └── calc.py                # 自进化产出：四则运算与统计分析新工具
+│   └── calc.py                # 自进化产物：四则运算与统计分析新工具
 ├── core/                      # Harness 核心引擎与门禁层
 │   ├── project.py             # 统一项目目录管理、工作区切换与规则自动注入
 │   ├── llm.py                 # 零额外依赖 OpenAI 兼容 LLM 客户端
