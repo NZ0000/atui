@@ -131,10 +131,14 @@ def _check_one(cond: Dict[str, Any], root: str) -> Dict[str, Any]:
             minimum = int(cond.get("min", 1))
             count = 0
             if os.path.isdir(d):
-                count = sum(1 for f in os.listdir(d) if fnmatch.fnmatch(f, pattern))
+                # recursive walk so patterns like *.glb match assets in subdirs
+                for dirpath, _dirnames, filenames in os.walk(d):
+                    for f in filenames:
+                        if fnmatch.fnmatch(f, pattern):
+                            count += 1
             res.update(
                 passed=count >= minimum,
-                detail=f"matched {count} files in '{cond.get('dir', '.')}' by '{pattern}', required >= {minimum}"
+                detail=f"matched {count} files in '{cond.get('dir', '.')}' by '{pattern}' (recursive), required >= {minimum}"
             )
 
         elif ctype == "file_size_min":
@@ -304,10 +308,20 @@ def evaluate_conditions(spec: Any, root_dir: Optional[str] = None) -> Dict[str, 
 def execute(params: Dict[str, Any]) -> Dict[str, Any]:
     spec: Any = params.get("conditions")
     conditions_file = params.get("conditions_file")
+    root_dir = params.get("root_dir")
 
     if not spec and conditions_file:
-        fp = _abs(_get_project_root(), conditions_file)
-        if not os.path.exists(fp):
+        # resolve against explicit root_dir first, then cwd, then active project
+        candidates = [root_dir, os.getcwd(), _get_project_root()]
+        fp = None
+        for base in candidates:
+            if not base:
+                continue
+            trial = _abs(base, conditions_file)
+            if os.path.exists(trial):
+                fp = trial
+                break
+        if fp is None:
             return make_result(False, error=f"conditions file '{conditions_file}' not found.")
         import json
         try:
