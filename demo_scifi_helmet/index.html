@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>深空战损机甲战斗头盔 (Damaged Battle Helmet) 3D 展厅</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            user-select: none;
+        }
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #05070c;
+            color: #e0e6ed;
+        }
+        #webgl-container {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+        /* HUD UI Overlay */
+        .hud-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 24px;
+        }
+        .interactive {
+            pointer-events: auto;
+        }
+        header.hud-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+        .title-box {
+            background: rgba(10, 15, 25, 0.75);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(0, 240, 255, 0.3);
+            border-left: 4px solid #00f0ff;
+            padding: 16px 24px;
+            border-radius: 4px;
+            box-shadow: 0 0 20px rgba(0, 240, 255, 0.15);
+        }
+        .title-box h1 {
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            color: #ffffff;
+            text-shadow: 0 0 10px rgba(0, 240, 255, 0.5);
+        }
+        .title-box p {
+            font-size: 11px;
+            color: #8ab4f8;
+            letter-spacing: 1px;
+            margin-top: 4px;
+            text-transform: uppercase;
+        }
+        .status-badge {
+            background: rgba(0, 255, 128, 0.15);
+            border: 1px solid rgba(0, 255, 128, 0.4);
+            color: #00ff80;
+            padding: 6px 12px;
+            font-size: 11px;
+            letter-spacing: 1px;
+            border-radius: 2px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 0 10px rgba(0, 255, 128, 0.2);
+        }
+        .pulse-dot {
+            width: 8px;
+            height: 8px;
+            background-color: #00ff80;
+            border-radius: 50%;
+            box-shadow: 0 0 8px #00ff80;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(0.95); opacity: 0.8; }
+            50% { transform: scale(1.2); opacity: 1; box-shadow: 0 0 12px #00ff80; }
+            100% { transform: scale(0.95); opacity: 0.8; }
+        }
+
+        /* Control Panel */
+        .control-panel {
+            align-self: flex-end;
+            background: rgba(10, 15, 25, 0.85);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(0, 240, 255, 0.25);
+            border-radius: 6px;
+            padding: 20px;
+            width: 300px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+        }
+        .panel-section {
+            margin-bottom: 16px;
+        }
+        .panel-section:last-child {
+            margin-bottom: 0;
+        }
+        .panel-section h3 {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: #00f0ff;
+            margin-bottom: 10px;
+            border-bottom: 1px solid rgba(0, 240, 255, 0.2);
+            padding-bottom: 4px;
+        }
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: 10px;
+        }
+        .control-group label {
+            font-size: 11px;
+            color: #a0aec0;
+            display: flex;
+            justify-content: space-between;
+        }
+        .control-group label span {
+            color: #00f0ff;
+            font-family: monospace;
+        }
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 4px;
+            background: #1a233a;
+            border-radius: 2px;
+            outline: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #00f0ff;
+            cursor: pointer;
+            box-shadow: 0 0 8px #00f0ff;
+        }
+        .btn-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        .cyber-btn {
+            background: rgba(0, 240, 255, 0.1);
+            border: 1px solid rgba(0, 240, 255, 0.4);
+            color: #00f0ff;
+            padding: 8px 12px;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+        .cyber-btn:hover {
+            background: rgba(0, 240, 255, 0.3);
+            box-shadow: 0 0 12px rgba(0, 240, 255, 0.4);
+            color: #ffffff;
+        }
+        .cyber-btn.active {
+            background: #00f0ff;
+            color: #05070c;
+            box-shadow: 0 0 15px rgba(0, 240, 255, 0.6);
+        }
+
+        /* Loading Screen */
+        #loader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #030509;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            pointer-events: none;
+            transition: opacity 0.5s ease;
+        }
+        .loader-spinner {
+            width: 60px;
+            height: 60px;
+            border: 3px solid rgba(0, 240, 255, 0.1);
+            border-top: 3px solid #00f0ff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            box-shadow: 0 0 20px rgba(0, 240, 255, 0.3);
+            margin-bottom: 20px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .loader-text {
+            font-size: 13px;
+            letter-spacing: 3px;
+            color: #00f0ff;
+            text-transform: uppercase;
+        }
+
+        footer.hud-footer {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            color: #64748b;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body>
+    <div id="loader">
+        <div class="loader-spinner"></div>
+        <div class="loader-text" id="loader-status">Initializing Neural Systems & PBR Engine...</div>
+    </div>
+
+    <div id="webgl-container"></div>
+
+    <div class="hud-overlay">
+        <header class="hud-header">
+            <div class="title-box">
+                <h1>MK-VII BATTLE HELMET</h1>
+                <p>Deep Space Tactical Armor // Model 04-Damaged</p>
+            </div>
+            <div class="status-badge">
+                <div class="pulse-dot"></div>
+                <span>SYSTEM ONLINE • 4K PBR // MSAA 4X</span>
+            </div>
+        </header>
+
+        <div class="control-panel interactive">
+            <div class="panel-section">
+                <h3>Telemetry & Motion</h3>
+                <div class="btn-row">
+                    <button class="cyber-btn active" id="btn-rotate">Auto Rotate</button>
+                    <button class="cyber-btn" id="btn-wireframe">Wireframe</button>
+                </div>
+            </div>
+
+            <div class="panel-section">
+                <h3>Optical Bloom (Post)</h3>
+                <div class="control-group">
+                    <label>Bloom Intensity <span id="val-bloom">0.80</span></label>
+                    <input type="range" id="range-bloom" min="0" max="2" step="0.05" value="0.8">
+                </div>
+                <div class="control-group">
+                    <label>Visor Emissive <span id="val-emissive">2.5</span></label>
+                    <input type="range" id="range-emissive" min="0.5" max="5" step="0.1" value="2.5">
+                </div>
+            </div>
+
+            <div class="panel-section">
+                <h3>Lighting & Environment</h3>
+                <div class="control-group">
+                    <label>Studio Intensity <span id="val-light">1.20</span></label>
+                    <input type="range" id="range-light" min="0.2" max="3" step="0.1" value="1.2">
+                </div>
+                <div class="btn-row">
+                    <button class="cyber-btn active" id="btn-env-studio">Studio Room</button>
+                    <button class="cyber-btn" id="btn-env-dark">Deep Space</button>
+                </div>
+            </div>
+        </div>
+
+        <footer class="hud-footer">
+            <span>Three.js r128 // WebGL2 Hardware MSAA</span>
+            <span>SECURE LINK // 360° INSPECT</span>
+        </footer>
+    </div>
+
+    <!-- Import Map for local offline modules -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "./vendor/three.module.js",
+                "three/addons/": "./vendor/addons/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+        let container, renderer, scene, camera, controls, composer, bloomPass;
+        let helmetGroup = null;
+        let visorMesh = null;
+        let directionalLight, hemisphereLight, rimLight;
+        let isAutoRotate = true;
+        let clock = new THREE.Clock();
+        let pmremGenerator, renderTarget;
+
+        init();
+        animate();
+
+        function init() {
+            container = document.getElementById('webgl-container');
+
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x05070c);
+
+            camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 100);
+            camera.position.set(0, 0.2, 2.8);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.2;
+            renderer.outputEncoding = THREE.sRGBEncoding;
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            pmremGenerator = new THREE.PMREMGenerator(renderer);
+            pmremGenerator.compileEquirectangularShader();
+            scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
+
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxPolarAngle = Math.PI / 2 + 0.1;
+            controls.minDistance = 1.0;
+            controls.maxDistance = 6.0;
+            controls.target.set(0, 0, 0);
+
+            hemisphereLight = new THREE.HemisphereLight(0x88bbff, 0x221133, 0.8);
+            scene.add(hemisphereLight);
+
+            directionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
+            directionalLight.position.set(3, 4, 3);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 2048;
+            directionalLight.shadow.mapSize.height = 2048;
+            directionalLight.shadow.bias = -0.0001;
+            scene.add(directionalLight);
+
+            rimLight = new THREE.DirectionalLight(0x00f0ff, 1.2);
+            rimLight.position.set(-3, 2, -3);
+            scene.add(rimLight);
+
+            const shadowGeo = new THREE.PlaneGeometry(15, 15);
+            const shadowMat = new THREE.ShadowMaterial({ opacity: 0.4 });
+            const shadowPlane = new THREE.Mesh(shadowGeo, shadowMat);
+            shadowPlane.rotation.x = -Math.PI / 2;
+            shadowPlane.position.y = -0.9;
+            shadowPlane.receiveShadow = true;
+            scene.add(shadowPlane);
+
+            renderTarget = new THREE.WebGLRenderTarget(
+                window.innerWidth * window.devicePixelRatio,
+                window.innerHeight * window.devicePixelRatio,
+                {
+                    samples: 4,
+                    format: THREE.RGBAFormat,
+                    encoding: THREE.sRGBEncoding
+                }
+            );
+
+            composer = new EffectComposer(renderer, renderTarget);
+            const renderPass = new RenderPass(scene, camera);
+            composer.addPass(renderPass);
+
+            bloomPass = new UnrealBloomPass(
+                new THREE.Vector2(window.innerWidth, window.innerHeight),
+                0.8,
+                0.4,
+                0.7
+            );
+            composer.addPass(bloomPass);
+
+            loadHelmetModel();
+            initUI();
+
+            window.addEventListener('resize', onWindowResize);
+
+            setTimeout(() => {
+                const loader = document.getElementById('loader');
+                loader.style.opacity = '0';
+                setTimeout(() => loader.style.display = 'none', 800);
+            }, 1200);
+        }
+
+        function loadHelmetModel() {
+            const loader = new GLTFLoader();
+            const statusEl = document.getElementById('loader-status');
+
+            loader.load(
+                './models/DamagedHelmet.gltf',
+                (gltf) => {
+                    helmetGroup = gltf.scene;
+                    helmetGroup.position.set(0, 0, 0);
+                    helmetGroup.scale.set(0.8, 0.8, 0.8);
+
+                    helmetGroup.traverse((child) => {
+                        if (child.isMesh) {
+                            child.castShadow = true;
+                            child.receiveShadow = true;
+                            if (child.geometry) {
+                                child.geometry.computeVertexNormals();
+                            }
+                            if (child.material) {
+                                child.material.flatShading = false;
+                                child.material.needsUpdate = true;
+                                if (child.name.toLowerCase().includes('visor') || child.material.name.toLowerCase().includes('visor')) {
+                                    visorMesh = child;
+                                }
+                            }
+                        }
+                    });
+
+                    scene.add(helmetGroup);
+                    statusEl.innerText = 'Neural Link Established // Ready';
+                    const loaderDiv = document.getElementById('loader');
+                    if (loaderDiv) loaderDiv.style.display = 'none';
+                },
+                (xhr) => {
+                    if (xhr.total > 0) {
+                        const pct = Math.floor((xhr.loaded / xhr.total) * 100);
+                        statusEl.innerText = `Loading Armor Asset... ${pct}%`;
+                    }
+                },
+                (error) => {
+                    console.warn('External GLTF load failed, switching to Procedural High-Detail Fallback Helmet:', error);
+                    statusEl.innerText = 'Deploying Procedural Armor Mesh...';
+                    createProceduralHelmet();
+                    const loaderDiv = document.getElementById('loader');
+                    if (loaderDiv) loaderDiv.style.display = 'none';
+                }
+            );
+        }
+
+        function createProceduralHelmet() {
+            helmetGroup = new THREE.Group();
+
+            const points = [];
+            for (let i = 0; i <= 15; i++) {
+                const t = i / 15;
+                const x = Math.sin(t * Math.PI) * 0.7 + (1 - t) * 0.2;
+                const y = (t - 0.5) * 1.6;
+                points.push(new THREE.Vector2(x, y));
+            }
+            const helmetGeo = new THREE.LatheGeometry(points, 32);
+            helmetGeo.computeVertexNormals();
+
+            const normalCanvas = document.createElement('canvas');
+            normalCanvas.width = 512;
+            normalCanvas.height = 512;
+            const ctx = normalCanvas.getContext('2d');
+            ctx.fillStyle = 'rgb(128,128,255)';
+            ctx.fillRect(0, 0, 512, 512);
+            ctx.strokeStyle = 'rgb(100, 150, 255)';
+            ctx.lineWidth = 4;
+            for (let i = 0; i < 10; i++) {
+                ctx.beginPath();
+                ctx.arc(256, 256, 30 + i * 20, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+            const normalMapTexture = new THREE.CanvasTexture(normalCanvas);
+            normalMapTexture.wrapS = THREE.RepeatWrapping;
+            normalMapTexture.wrapT = THREE.RepeatWrapping;
+
+            const helmetMat = new THREE.MeshStandardMaterial({
+                color: 0x222831,
+                metalness: 0.85,
+                roughness: 0.3,
+                normalMap: normalMapTexture,
+                normalScale: new THREE.Vector2(0.5, 0.5),
+                flatShading: false
+            });
+
+            const mainMesh = new THREE.Mesh(helmetGeo, helmetMat);
+            mainMesh.castShadow = true;
+            mainMesh.receiveShadow = true;
+            helmetGroup.add(mainMesh);
+
+            const visorGeo = new THREE.CylinderGeometry(0.62, 0.55, 0.5, 32, 1, false, -Math.PI/2, Math.PI);
+            visorGeo.computeVertexNormals();
+            const visorMat = new THREE.MeshStandardMaterial({
+                color: 0x00f0ff,
+                emissive: 0x00f0ff,
+                emissiveIntensity: 2.5,
+                metalness: 0.9,
+                roughness: 0.1,
+                flatShading: false
+            });
+            visorMesh = new THREE.Mesh(visorGeo, visorMat);
+            visorMesh.position.set(0, 0.05, 0.15);
+            visorMesh.rotation.x = 0.1;
+            helmetGroup.add(visorMesh);
+
+            const earGeo = new THREE.BoxGeometry(0.2, 0.4, 0.5);
+            earGeo.computeVertexNormals();
+            const earMat = new THREE.MeshStandardMaterial({ color: 0x111620, metalness: 0.9, roughness: 0.4 });
+            
+            const leftEar = new THREE.Mesh(earGeo, earMat);
+            leftEar.position.set(0.72, 0, 0);
+            leftEar.castShadow = true;
+            helmetGroup.add(leftEar);
+
+            const rightEar = new THREE.Mesh(earGeo, earMat);
+            rightEar.position.set(-0.72, 0, 0);
+            rightEar.castShadow = true;
+            helmetGroup.add(rightEar);
+
+            helmetGroup.position.set(0, 0, 0);
+            scene.add(helmetGroup);
+            document.getElementById('loader-status').innerText = 'Procedural Armor Deployed';
+        }
+
+        function initUI() {
+            const btnRotate = document.getElementById('btn-rotate');
+            btnRotate.addEventListener('click', () => {
+                isAutoRotate = !isAutoRotate;
+                btnRotate.classList.toggle('active', isAutoRotate);
+            });
+
+            const btnWireframe = document.getElementById('btn-wireframe');
+            let isWireframe = false;
+            btnWireframe.addEventListener('click', () => {
+                isWireframe = !isWireframe;
+                btnWireframe.classList.toggle('active', isWireframe);
+                if (helmetGroup) {
+                    helmetGroup.traverse(c => {
+                        if (c.isMesh && c.material) c.material.wireframe = isWireframe;
+                    });
+                }
+            });
+
+            const rangeBloom = document.getElementById('range-bloom');
+            const valBloom = document.getElementById('val-bloom');
+            rangeBloom.addEventListener('input', (e) => {
+                const val = parseFloat(e.target.value);
+                bloomPass.strength = val;
+                valBloom.innerText = val.toFixed(2);
+            });
+
+            const rangeEmissive = document.getElementById('range-emissive');
+            const valEmissive = document.getElementById('val-emissive');
+            rangeEmissive.addEventListener('input', (e) => {
+                const val = parseFloat(e.target.value);
+                valEmissive.innerText = val.toFixed(1);
+                if (visorMesh && visorMesh.material) {
+                    visorMesh.material.emissiveIntensity = val;
+                } else if (helmetGroup) {
+                    helmetGroup.traverse(c => {
+                        if (c.isMesh && c.material && (c.material.emissive && c.material.emissive.getHex() > 0)) {
+                            c.material.emissiveIntensity = val;
+                        }
+                    });
+                }
+            });
+
+            const rangeLight = document.getElementById('range-light');
+            const valLight = document.getElementById('val-light');
+            rangeLight.addEventListener('input', (e) => {
+                const val = parseFloat(e.target.value);
+                valLight.innerText = val.toFixed(2);
+                directionalLight.intensity = val * 1.5;
+                hemisphereLight.intensity = val * 0.8;
+            });
+
+            const btnEnvStudio = document.getElementById('btn-env-studio');
+            const btnEnvDark = document.getElementById('btn-env-dark');
+
+            btnEnvStudio.addEventListener('click', () => {
+                btnEnvStudio.classList.add('active');
+                btnEnvDark.classList.remove('active');
+                scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
+                scene.background = new THREE.Color(0x05070c);
+            });
+
+            btnEnvDark.addEventListener('click', () => {
+                btnEnvDark.classList.add('active');
+                btnEnvStudio.classList.remove('active');
+                scene.environment = null;
+                scene.background = new THREE.Color(0x010204);
+            });
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const delta = clock.getDelta();
+
+            if (helmetGroup && isAutoRotate) {
+                helmetGroup.rotation.y += delta * 0.35;
+            }
+
+            controls.update();
+            composer.render();
+        }
+    </script>
+</body>
+</html>

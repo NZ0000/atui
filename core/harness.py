@@ -231,18 +231,13 @@ class AgentHarness:
         if rules.get("require_output_file", True) and output_file:
             from core.project import get_current_project
             proj = get_current_project()
-            candidate_paths = []
             if not os.path.isabs(output_file) and proj and proj.path:
-                candidate_paths.append(os.path.join(proj.path, output_file))
-            candidate_paths.append(output_file)
+                target_p = os.path.join(proj.path, output_file)
+            else:
+                target_p = output_file
 
-            found = False
-            for p in candidate_paths:
-                if os.path.exists(p) and os.path.getsize(p) > 0:
-                    found = True
-                    break
-            if not found:
-                return False, f"未检测到指定的产出文件 `{output_file}`。请使用 write 工具创建并写入该文件。"
+            if not os.path.exists(target_p) or os.path.getsize(target_p) == 0:
+                return False, f"未检测到指定的产出文件 `{output_file}`（预期绝对路径: {target_p}）。请使用 write 工具创建并写入该文件。"
 
         if rules.get("require_diff", False):
             diff_res = tools.execute_tool("git_tool", {"action": "diff"})

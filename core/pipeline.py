@@ -61,13 +61,15 @@ class PipelineOrchestrator:
             "deliverables/acceptance_criteria.md",
             "deliverables/plan.md"
         ]
+        repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         for sf in stale_files:
-            s_abs = os.path.join(proj.path, sf)
-            if os.path.exists(s_abs):
-                try:
-                    os.remove(s_abs)
-                except Exception:
-                    pass
+            for base_dir in [proj.path, repo_root]:
+                s_abs = os.path.join(base_dir, sf)
+                if os.path.exists(s_abs):
+                    try:
+                        os.remove(s_abs)
+                    except Exception:
+                        pass
 
         # Stage 0: Environment Probe & Base Setup (DevOps)
         try:
@@ -132,9 +134,12 @@ class PipelineOrchestrator:
         coder_output = "deliverables/code_changes.md"
         coder_task = (
             f"目标任务：{task}\n"
-            f"规划方案已保存在 `{plan_output}`。请查阅规划方案及现有测试用例。\n"
-            f"严格遵循项目规则（rule/rule.md），编写或修改代码以使所有测试用例通过。\n"
-            f"将完成的代码变更清单与修改说明输出至：{coder_output}"
+            f"规划方案已保存在 `{plan_output}`。请查阅规划方案、燃尽清单 (`deliverables/acceptance_criteria.md`) 及项目规则 (`rule.md`)。\n"
+            f"你的核心职责是编写实现代码：\n"
+            f"1. 调用 `vendor_assets` 下载必要的离线依赖与模型资产（如 helmet/car/robot 等）；\n"
+            f"2. 编写项目测试用例（如 `tests/test_xxx.py`）；\n"
+            f"3. 编写核心功能代码（如 `index.html` 及其相关模块、样式与着色器）；\n"
+            f"4. 必须使用 `write` 工具将代码实际写入工作区，严禁空跑，完成后将变更清单与设计说明输出至：{coder_output}"
         )
         code_res = coder_harness.run(coder_task, output_file=coder_output)
         stage_records.append({"stage": "coding", "result": code_res})
@@ -290,12 +295,20 @@ class PipelineOrchestrator:
             stage_records.append({"stage": "testing", "loop": loop_count, "status": "failed", "verif": verif})
             default_bus.publish(EventType.TDD_CYCLE, {"loop": loop_count, "status": "tests_failed", "details": verif["error_details"]})
 
+            # Invalidate previous code_changes.md so Coder must generate fresh changes
+            coder_out_abs = os.path.join(proj.path, coder_output)
+            if os.path.exists(coder_out_abs):
+                try:
+                    os.remove(coder_out_abs)
+                except Exception:
+                    pass
+
             repair_task = (
                 f"【测试或审美验收未通过，进入代码自修复第 {loop_count} 轮】\n"
                 f"未通过详情如下：\n{verif['error_details']}\n\n"
                 f"请仔细阅读未通过详情、测试报告（{test_report_file}）、设计审美审查报告（deliverables/design_audit.md，若存在）以及验收燃尽清单（deliverables/acceptance_criteria.md），\n"
-                f"修正代码逻辑缺陷并精修模型结构与光影材质，确保测试用例与审美验收项全部达成并通过。\n"
-                f"将修复说明写入：{coder_output}"
+                f"你必须使用 write 工具真正编写/修改代码文件（如 index.html、tests/ 等），消除所有报错并满足审美指标！\n"
+                f"修复完成后必须将最新代码变更说明写入：{coder_output}"
             )
             repair_res = coder_harness.run(repair_task, output_file=coder_output)
             if not repair_res.get("success"):
