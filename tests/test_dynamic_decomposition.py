@@ -229,6 +229,7 @@ def test_acceptance_authority_helpers():
     with tempfile.TemporaryDirectory() as tmp:
         # --- profile detection ---
         os.makedirs(os.path.join(tmp, "models"))
+        open(os.path.join(tmp, "models", "flamingo.glb"), "wb").close()
         open(os.path.join(tmp, "index.html"), "w").close()
         profile = pipeline._detect_project_profile(tmp)
         assert profile["web"] is True and profile["python"] is False and profile["lua"] is False

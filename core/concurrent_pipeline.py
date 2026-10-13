@@ -1219,7 +1219,7 @@ class ConcurrentModularPipeline:
 
         # Only true 3D-asset projects (models/ holding .glb/.gltf): references must resolve.
         # MVC-style models/ dirs must not trigger this or the gate false-fails forever.
-        if self._has_3d_assets(project_path) and "code_reference_integrity" not in existing_types:
+        if ConcurrentModularPipeline._has_3d_assets(project_path) and "code_reference_integrity" not in existing_types:
             conds.append({
                 "type": "code_reference_integrity",
                 "scan_glob": "*.js",
