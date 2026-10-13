@@ -1,4 +1,4 @@
-import * as THREE from '../vendor/three/three.module.js';
+import * as THREE from 'three';
 
 export class Buildings {
     constructor(scene, count = 24) {
@@ -21,13 +21,15 @@ export class Buildings {
         const neonColors = [0x00f0ff, 0xff0055, 0x7000ff, 0x00ff88];
 
         for (let i = 0; i < this.buildingCount; i++) {
-            const width = 8 + Math.random() * 12;
-            const depth = 8 + Math.random() * 12;
-            const height = 25 + Math.random() * 65;
+            const width = 10 + Math.random() * 14;
+            const depth = 10 + Math.random() * 14;
+            const height = 30 + Math.random() * 60;
 
-            // Arrange in a circular district layout avoiding center (0,0)
-            const angle = (i / this.buildingCount) * Math.PI * 2 + (Math.random() * 0.2);
-            const radius = 35 + Math.random() * 70;
+            // Arrange in a circular district layout with open central plaza & south viewing avenue
+            const angle = (i / this.buildingCount) * Math.PI * 2;
+            if (Math.abs(angle - Math.PI / 2) < 0.45) continue; // Keep southern camera boulevard open
+
+            const radius = 50 + Math.random() * 55;
             const x = Math.cos(angle) * radius;
             const z = Math.sin(angle) * radius;
 

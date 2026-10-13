@@ -9,7 +9,7 @@
  * - Standard lifecycle methods: constructor(), addTo(scene), update(delta)
  */
 
-import * as THREE from 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.module.js';
+import * as THREE from 'three';
 
 export class Props {
     constructor(scene) {
