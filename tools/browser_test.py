@@ -92,6 +92,7 @@ async def _cdp_session(
     warnings = []
     console_logs = []
     network_failures = []
+    request_map = {}
     screenshot_base64 = ""
 
     async with websockets.connect(ws_url, max_size=20 * 1024 * 1024) as ws:
@@ -169,12 +170,23 @@ async def _cdp_session(
                     else:
                         console_logs.append({"level": ctype, "text": txt})
 
+                elif method == "Network.requestWillBeSent":
+                    req_id = params.get("requestId", "")
+                    req_url = params.get("request", {}).get("url", "")
+                    if req_id and req_url:
+                        request_map[req_id] = req_url
+
                 elif method == "Network.loadingFailed":
-                    network_failures.append({
-                        "url": params.get("requestId", ""),
-                        "error": params.get("errorText", "Network request failed"),
-                        "type": params.get("type", "")
-                    })
+                    req_id = params.get("requestId", "")
+                    err_text = params.get("errorText", "Network request failed")
+                    is_canceled = params.get("canceled", False) or err_text == "net::ERR_ABORTED"
+                    if not is_canceled:
+                        req_url = request_map.get(req_id, req_id)
+                        network_failures.append({
+                            "url": req_url,
+                            "error": err_text,
+                            "type": params.get("type", "")
+                        })
 
             except asyncio.TimeoutError:
                 if time.time() - start_time >= wait_seconds:

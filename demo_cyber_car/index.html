@@ -3,14 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CYBER-SPEAR GT // 未来概念超跑 3D 展厅</title>
+  <title>CYBER-SPEAR GT // 未来工业级超跑 3D 展厅</title>
   <style>
     :root {
       --bg: #07090e;
       --accent: #00f3ff;
-      --accent-glow: rgba(0, 243, 255, 0.4);
-      --neon-magenta: #ff0055;
-      --card-bg: rgba(12, 17, 28, 0.75);
+      --card-bg: rgba(12, 17, 28, 0.8);
       --border: rgba(0, 243, 255, 0.25);
     }
     * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
@@ -36,9 +34,7 @@
       background: rgba(0, 243, 255, 0.15); border: 1px solid var(--accent);
       color: var(--accent); letter-spacing: 1px; font-weight: 600;
     }
-    .hud-sub {
-      font-size: 12px; color: #7f99b2; letter-spacing: 2px; margin-top: 6px;
-    }
+    .hud-sub { font-size: 12px; color: #7f99b2; letter-spacing: 2px; margin-top: 6px; }
 
     /* HUD Specs Panel */
     .hud-specs {
@@ -91,9 +87,14 @@
     .diag-row { display: flex; justify-content: space-between; gap: 20px; margin-bottom: 6px; }
     .diag-row:last-child { margin-bottom: 0; }
     .diag-good { color: #00ffaa; font-weight: 700; }
+    #loading-indicator {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      font-size: 14px; color: var(--accent); letter-spacing: 2px; z-index: 20;
+      background: rgba(7, 9, 14, 0.85); padding: 12px 24px; border-radius: 8px;
+      border: 1px solid var(--border); pointer-events: none; transition: opacity 0.4s;
+    }
   </style>
 
-  <!-- Import maps for local ESM resolution -->
   <script type="importmap">
   {
     "imports": {
@@ -104,12 +105,14 @@
   </script>
 </head>
 <body>
+  <div id="loading-indicator">三维高精资产加载中 (Loading GLTF Model)...</div>
+
   <div class="hud-header">
     <div class="hud-title">
       CYBER-SPEAR GT
       <span class="hud-badge">PROTOTYPE-01</span>
     </div>
-    <div class="hud-sub">HYPER-AERODYNAMIC ELECTRIC CONCEPT VEHICLE</div>
+    <div class="hud-sub">INDUSTRY-GRADE 3D SHOWCASE // HDR STUDIO ENVIRONMENT</div>
   </div>
 
   <div class="hud-specs">
@@ -128,20 +131,21 @@
   </div>
 
   <div class="hud-diag">
-    <div class="diag-row"><span>渲染管线:</span><span class="diag-good">Three.js PBR + Bloom</span></div>
-    <div class="diag-row"><span>贴图技术:</span><span class="diag-good">内存 Canvas 离屏法线贴图</span></div>
-    <div class="diag-row"><span>状态遥测:</span><span class="diag-good">100% 离线自包含就绪</span></div>
+    <div class="diag-row"><span>环境光照:</span><span class="diag-good">RoomEnvironment HDR 360°</span></div>
+    <div class="diag-row"><span>模型资产:</span><span class="diag-good">工业级 GLTF (.glb) 真实装配</span></div>
+    <div class="diag-row"><span>贴图技术:</span><span class="diag-good">内存 Canvas 离屏碳纤法线</span></div>
+    <div class="diag-row"><span>离线运行:</span><span class="diag-good">100% 本地自包含零 404</span></div>
   </div>
 
   <div class="hud-controls">
     <div class="ctrl-group">
       <span class="ctrl-label">车漆:</span>
-      <div class="color-btn active" style="background: #00f3ff;" data-color="#00f3ff" title="赛博电光青"></div>
+      <div class="color-btn active" style="background: #e61919;" data-color="#e61919" title="极速烈焰红"></div>
+      <div class="color-btn" style="background: #00d2ff;" data-color="#00d2ff" title="赛博电光青"></div>
       <div class="color-btn" style="background: #11141a;" data-color="#11141a" title="暗夜隐形黑"></div>
-      <div class="color-btn" style="background: #ff0055;" data-color="#ff0055" title="炽热极光绯"></div>
-      <div class="color-btn" style="background: #d4af37;" data-color="#d4af37" title="钛合金鎏金"></div>
+      <div class="color-btn" style="background: #e6b800;" data-color="#e6b800" title="钛合金鎏金"></div>
+      <div class="color-btn" style="background: #f0f0f0;" data-color="#f0f0f0" title="珠光珍珠白"></div>
     </div>
-    <button class="btn-toggle active" id="btn-lights">车灯光效: ON</button>
     <button class="btn-toggle active" id="btn-bloom">电影级辉光: ON</button>
     <button class="btn-toggle" id="btn-spin">展厅自转: OFF</button>
   </div>
@@ -151,390 +155,237 @@
   <script type="module">
     import * as THREE from 'three';
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+    import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
     import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
     import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
     import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 
     // --- 1. Procedural In-Memory Canvas Texture Generator ---
-    // Generates high-detail carbon fiber & metallic panel seam normal maps & roughness maps
     function createProceduralCarbonTextures() {
-      const size = 1024;
-      
-      // Normal Map Canvas
+      const size = 512;
       const nCanvas = document.createElement('canvas');
       nCanvas.width = size; nCanvas.height = size;
       const nCtx = nCanvas.getContext('2d');
-      // Flat tangent normal baseline: RGB(128, 128, 255)
-      nCtx.fillStyle = 'rgb(128, 128, 255)';
+      nCtx.fillStyle = 'rgb(128, 128, 255)'; // Base flat tangent normal
       nCtx.fillRect(0, 0, size, size);
 
-      // Roughness Map Canvas
       const rCanvas = document.createElement('canvas');
       rCanvas.width = size; rCanvas.height = size;
       const rCtx = rCanvas.getContext('2d');
-      rCtx.fillStyle = 'rgb(40, 40, 40)'; // Base smooth clearcoat
+      rCtx.fillStyle = 'rgb(50, 50, 50)';
       rCtx.fillRect(0, 0, size, size);
 
-      // Draw Carbon Fiber Twill Weave Pattern
       const step = 8;
       for (let y = 0; y < size; y += step) {
         for (let x = 0; x < size; x += step) {
-          const isDiag = ((x + y) / step) % 2 === 0;
-          if (isDiag) {
-            // Normal tangent slope slope
-            nCtx.fillStyle = 'rgb(148, 110, 250)';
+          if (((x + y) / step) % 2 === 0) {
+            nCtx.fillStyle = 'rgb(145, 115, 250)';
             nCtx.fillRect(x, y, step, step);
-            rCtx.fillStyle = 'rgb(75, 75, 75)';
+            rCtx.fillStyle = 'rgb(80, 80, 80)';
             rCtx.fillRect(x, y, step, step);
           } else {
-            nCtx.fillStyle = 'rgb(110, 148, 250)';
+            nCtx.fillStyle = 'rgb(115, 145, 250)';
             nCtx.fillRect(x, y, step, step);
-            rCtx.fillStyle = 'rgb(35, 35, 35)';
+            rCtx.fillStyle = 'rgb(30, 30, 30)';
             rCtx.fillRect(x, y, step, step);
           }
         }
       }
 
-      // Add panel gap line grooves
-      nCtx.lineWidth = 4;
-      nCtx.strokeStyle = 'rgb(80, 80, 240)';
-      nCtx.strokeRect(32, 32, size - 64, size - 64);
-      nCtx.beginPath();
-      nCtx.moveTo(0, size / 2); nCtx.lineTo(size, size / 2);
-      nCtx.stroke();
-
       const normalTex = new THREE.CanvasTexture(nCanvas);
       normalTex.wrapS = THREE.RepeatWrapping;
       normalTex.wrapT = THREE.RepeatWrapping;
-      normalTex.repeat.set(16, 16);
+      normalTex.repeat.set(12, 12);
 
       const roughTex = new THREE.CanvasTexture(rCanvas);
       roughTex.wrapS = THREE.RepeatWrapping;
       roughTex.wrapT = THREE.RepeatWrapping;
-      roughTex.repeat.set(16, 16);
+      roughTex.repeat.set(12, 12);
 
       return { normalTex, roughTex };
     }
 
     const { normalTex, roughTex } = createProceduralCarbonTextures();
 
-    // --- 2. Three.js Scene, Camera, Renderer ---
+    // --- 2. Scene, Camera, Renderer ---
     const canvas = document.getElementById('webgl-canvas');
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x06080d);
-    scene.fog = new THREE.FogExp2(0x06080d, 0.035);
+    scene.background = new THREE.Color(0x07090e);
+    scene.fog = new THREE.FogExp2(0x07090e, 0.03);
 
     const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
-    camera.position.set(4.8, 2.2, 5.2);
+    camera.position.set(4.2, 1.8, 4.6);
 
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.1;
+    renderer.toneMappingExposure = 1.05;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    // --- 3. HDR Studio RoomEnvironment (彻底解决旋转背光变暗) ---
+    const pmremGenerator = new THREE.PMREMGenerator(renderer);
+    pmremGenerator.compileEquirectangularShader();
+    const roomEnv = new RoomEnvironment();
+    scene.environment = pmremGenerator.fromScene(roomEnv, 0.04).texture;
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
-    controls.maxPolarAngle = Math.PI / 2 - 0.04; // Don't clip below ground
-    controls.minDistance = 2.5;
-    controls.maxDistance = 14;
-    controls.target.set(0, 0.5, 0);
+    controls.maxPolarAngle = Math.PI / 2 - 0.03;
+    controls.minDistance = 2.0;
+    controls.maxDistance = 12.0;
+    controls.target.set(0, 0.45, 0);
 
-    // --- 3. Cinema Post-Processing: UnrealBloomPass ---
+    // --- 4. UnrealBloomPass Optical Glow ---
     const renderScene = new RenderPass(scene, camera);
     const bloomPass = new UnrealBloomPass(
       new THREE.Vector2(window.innerWidth, window.innerHeight),
-      0.75, // balanced strength
-      0.25, // tight radius
-      0.88  // high threshold so only headlights/lasers bloom
+      0.65, // strength
+      0.25, // radius
+      0.88  // threshold
     );
 
     const composer = new EffectComposer(renderer);
     composer.addPass(renderScene);
     composer.addPass(bloomPass);
 
-    // --- 4. Multi-Light Hierarchy (No Black Crush) ---
-    // 4.1 Ambient & Hemisphere fill
-    const hemiLight = new THREE.HemisphereLight(0x4466aa, 0x111c2e, 1.4);
+    // --- 5. Complementary Directional & Fill Lighting ---
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x111622, 1.2);
     scene.add(hemiLight);
 
-    const ambLight = new THREE.AmbientLight(0x162233, 0.9);
-    scene.add(ambLight);
+    const keyLight = new THREE.DirectionalLight(0xffffff, 2.5);
+    keyLight.position.set(4, 7, 3);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.width = 2048;
+    keyLight.shadow.mapSize.height = 2048;
+    keyLight.shadow.bias = -0.0005;
+    scene.add(keyLight);
 
-    // 4.2 Main Directional Sun Light
-    const dirLight = new THREE.DirectionalLight(0xffffff, 3.2);
-    dirLight.position.set(5, 8, 4);
-    dirLight.castShadow = true;
-    dirLight.shadow.mapSize.width = 2048;
-    dirLight.shadow.mapSize.height = 2048;
-    dirLight.shadow.bias = -0.0005;
-    scene.add(dirLight);
+    const fillLight = new THREE.DirectionalLight(0x00f3ff, 1.5);
+    fillLight.position.set(-5, 4, -4);
+    scene.add(fillLight);
 
-    // 4.3 Rim Contour Light (Back/Side highlight)
-    const rimLight = new THREE.DirectionalLight(0x00f3ff, 2.5);
-    rimLight.position.set(-6, 4, -5);
-    scene.add(rimLight);
-
-    // 4.4 Subtle Underglow Accent Light
-    const underglow = new THREE.PointLight(0x00f3ff, 0.15, 3);
-    underglow.position.set(0, 0.05, 0);
-    scene.add(underglow);
-
-    // --- 5. Studio Environment & Mirrored Floor ---
+    // --- 6. Showroom Platform Floor ---
     const floorGeo = new THREE.PlaneGeometry(60, 60);
     const floorMat = new THREE.MeshStandardMaterial({
-      color: 0x090c14,
-      roughness: 0.2,
-      metalness: 0.8,
+      color: 0x090c13,
+      roughness: 0.25,
+      metalness: 0.85
     });
     const floor = new THREE.Mesh(floorGeo, floorMat);
     floor.rotation.x = -Math.PI / 2;
     floor.receiveShadow = true;
     scene.add(floor);
 
-    // Circular illuminated showroom platform
-    const platformGeo = new THREE.CylinderGeometry(4.2, 4.4, 0.08, 64);
-    const platformMat = new THREE.MeshStandardMaterial({
-      color: 0x0c121e,
-      roughness: 0.35,
-      metalness: 0.7
-    });
-    const platform = new THREE.Mesh(platformGeo, platformMat);
-    platform.position.y = 0.04;
+    // Platform disc
+    const platGeo = new THREE.CylinderGeometry(3.8, 4.0, 0.06, 64);
+    const platMat = new THREE.MeshStandardMaterial({ color: 0x0c111a, roughness: 0.3, metalness: 0.8 });
+    const platform = new THREE.Mesh(platGeo, platMat);
+    platform.position.y = 0.03;
     platform.receiveShadow = true;
     scene.add(platform);
 
-    const ringGeo = new THREE.RingGeometry(4.2, 4.28, 64);
+    const ringGeo = new THREE.RingGeometry(3.8, 3.86, 64);
     const ringMat = new THREE.MeshBasicMaterial({ color: 0x00f3ff, side: THREE.DoubleSide });
     const platformRing = new THREE.Mesh(ringGeo, ringMat);
     platformRing.rotation.x = -Math.PI / 2;
-    platformRing.position.y = 0.082;
+    platformRing.position.y = 0.062;
     scene.add(platformRing);
 
-    // --- 6. Compound 3D Concept Supercar Hierarchy ---
+    // --- 7. Industrial-Grade Car Model Loading (GLTF / GLB) ---
     const carRoot = new THREE.Group();
     scene.add(carRoot);
 
-    // Car Materials
-    const bodyMaterial = new THREE.MeshPhysicalMaterial({
-      color: 0x141a24, // Sleek Dark Titanium / Stealth Cyber Paint
-      metalness: 0.9,
-      roughness: 0.25,
-      clearcoat: 1.0,
-      clearcoatRoughness: 0.1,
-      normalMap: normalTex,
-      roughnessMap: roughTex,
-      reflectivity: 0.95
-    });
+    let bodyMaterials = [];
+    const bodyColor = new THREE.Color(0xe61919);
 
-    const carbonMaterial = new THREE.MeshStandardMaterial({
-      color: 0x111317,
-      metalness: 0.3,
-      roughness: 0.45,
-      normalMap: normalTex,
-      roughnessMap: roughTex
-    });
+    const dracoLoader = new DRACOLoader();
+    dracoLoader.setDecoderPath('vendor/three/addons/libs/draco/gltf/');
 
-    const glassMaterial = new THREE.MeshPhysicalMaterial({
-      color: 0x07111a,
-      metalness: 0.9,
-      roughness: 0.05,
-      transmission: 0.6,
-      transparent: true,
-      opacity: 0.85
-    });
+    const loader = new GLTFLoader();
+    loader.setDRACOLoader(dracoLoader);
+    const loadingElem = document.getElementById('loading-indicator');
 
-    const headlightMaterial = new THREE.MeshStandardMaterial({
-      color: 0xffffff,
-      emissive: 0x00f3ff,
-      emissiveIntensity: 3.5,
-      roughness: 0.1
-    });
+    loader.load(
+      'models/ferrari.glb',
+      (gltf) => {
+        const carModel = gltf.scene;
+        carModel.scale.set(0.9, 0.9, 0.9);
+        carModel.position.set(0, 0, 0);
 
-    const taillightMaterial = new THREE.MeshStandardMaterial({
-      color: 0xff0044,
-      emissive: 0xff0044,
-      emissiveIntensity: 4.0,
-      roughness: 0.1
-    });
+        carModel.traverse((child) => {
+          if (child.isMesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
 
-    // 6.1 Main Low-Slung Fuselage
-    const mainFuselage = new THREE.Group();
-    carRoot.add(mainFuselage);
+            const name = (child.name || '').toLowerCase();
+            const matName = (child.material && child.material.name ? child.material.name : '').toLowerCase();
 
-    // Core central chassis
-    const chassisGeo = new THREE.BoxGeometry(1.6, 0.42, 3.8);
-    const chassisMesh = new THREE.Mesh(chassisGeo, bodyMaterial);
-    chassisMesh.position.y = 0.42;
-    chassisMesh.castShadow = true;
-    mainFuselage.add(chassisMesh);
+            // Intercept and upgrade car body paint
+            if (name.includes('body') || matName.includes('body') || matName.includes('red') || matName.includes('paint')) {
+              child.material = new THREE.MeshPhysicalMaterial({
+                color: bodyColor,
+                metalness: 0.85,
+                roughness: 0.15,
+                clearcoat: 1.0,
+                clearcoatRoughness: 0.05,
+                reflectivity: 0.9
+              });
+              bodyMaterials.push(child.material);
+            }
+            // Carbon parts (spoiler, trim, diffusers)
+            else if (name.includes('trim') || name.includes('carbon') || matName.includes('carbon')) {
+              child.material.normalMap = normalTex;
+              child.material.roughnessMap = roughTex;
+            }
+            // Glass windshield & windows
+            else if (name.includes('glass') || matName.includes('glass')) {
+              child.material = new THREE.MeshPhysicalMaterial({
+                color: 0x050a10,
+                metalness: 0.9,
+                roughness: 0.05,
+                transmission: 0.75,
+                transparent: true,
+                opacity: 0.85
+              });
+            }
+            // Front & Rear lights (emissive bloom boost)
+            else if (name.includes('light') || matName.includes('light')) {
+              if (child.material) {
+                child.material.emissiveIntensity = 2.5;
+              }
+            }
+          }
+        });
 
-    // Front Slanted Hood Wedge
-    const hoodGeo = new THREE.CylinderGeometry(0.75, 0.88, 1.4, 32);
-    const hoodMesh = new THREE.Mesh(hoodGeo, bodyMaterial);
-    hoodMesh.rotation.x = Math.PI / 2;
-    hoodMesh.scale.set(0.9, 1.0, 0.26);
-    hoodMesh.position.set(0, 0.48, 1.25);
-    hoodMesh.castShadow = true;
-    mainFuselage.add(hoodMesh);
-
-    // Front Splitter
-    const splitterGeo = new THREE.BoxGeometry(1.78, 0.06, 0.6);
-    const splitterMesh = new THREE.Mesh(splitterGeo, carbonMaterial);
-    splitterMesh.position.set(0, 0.18, 1.95);
-    splitterMesh.castShadow = true;
-    mainFuselage.add(splitterMesh);
-
-    // Aerodynamic Canopy (Cockpit)
-    const canopyGeo = new THREE.SphereGeometry(0.82, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2);
-    const canopyMesh = new THREE.Mesh(canopyGeo, glassMaterial);
-    canopyMesh.scale.set(0.92, 0.62, 1.6);
-    canopyMesh.position.set(0, 0.52, -0.05);
-    canopyMesh.castShadow = true;
-    mainFuselage.add(canopyMesh);
-
-    // Aerodynamic Side Pods (Left & Right)
-    [-0.88, 0.88].forEach(x => {
-      const podGeo = new THREE.BoxGeometry(0.24, 0.36, 2.2);
-      const pod = new THREE.Mesh(podGeo, bodyMaterial);
-      pod.position.set(x, 0.38, 0.0);
-      pod.castShadow = true;
-      mainFuselage.add(pod);
-
-      // Intake vent scoop
-      const scoopGeo = new THREE.BoxGeometry(0.08, 0.28, 0.8);
-      const scoop = new THREE.Mesh(scoopGeo, carbonMaterial);
-      scoop.position.set(x + (x > 0 ? 0.1 : -0.1), 0.38, 0.5);
-      mainFuselage.add(scoop);
-    });
-
-    // Rear Aero Wing (Airfoil & Endplates)
-    const wingBladeGeo = new THREE.BoxGeometry(1.82, 0.05, 0.38);
-    const wingBlade = new THREE.Mesh(wingBladeGeo, carbonMaterial);
-    wingBlade.position.set(0, 0.92, -1.8);
-    wingBlade.castShadow = true;
-    mainFuselage.add(wingBlade);
-
-    // Wing Struts (Pylons)
-    [-0.5, 0.5].forEach(x => {
-      const pylonGeo = new THREE.BoxGeometry(0.05, 0.32, 0.22);
-      const pylon = new THREE.Mesh(pylonGeo, carbonMaterial);
-      pylon.position.set(x, 0.76, -1.78);
-      mainFuselage.add(pylon);
-    });
-
-    // 6.2 Glowing Cyber Light Blades
-    // Front LED Blade Headlights (Left & Right)
-    [-0.65, 0.65].forEach(x => {
-      const hlGeo = new THREE.BoxGeometry(0.32, 0.04, 0.12);
-      const hl = new THREE.Mesh(hlGeo, headlightMaterial);
-      hl.position.set(x, 0.44, 1.88);
-      mainFuselage.add(hl);
-    });
-
-    // Full-Width Rear Neon Blade Taillight
-    const tlGeo = new THREE.BoxGeometry(1.68, 0.04, 0.06);
-    const tl = new THREE.Mesh(tlGeo, taillightMaterial);
-    tl.position.set(0, 0.52, -1.91);
-    mainFuselage.add(tl);
-
-    // 6.3 Detailed High-Poly Wheel Assemblies
-    function createWheel(isFront) {
-      const wheelGroup = new THREE.Group();
-
-      // Outer Tire with rim grooves
-      const tireGeo = new THREE.CylinderGeometry(0.38, 0.38, 0.26, 32);
-      const tireMat = new THREE.MeshStandardMaterial({
-        color: 0x141416,
-        roughness: 0.85,
-        metalness: 0.1
-      });
-      const tire = new THREE.Mesh(tireGeo, tireMat);
-      tire.rotation.z = Math.PI / 2;
-      tire.castShadow = true;
-      wheelGroup.add(tire);
-
-      // Inner Alloy Wheel Rim
-      const rimGeo = new THREE.CylinderGeometry(0.28, 0.28, 0.27, 24);
-      const rimMat = new THREE.MeshStandardMaterial({
-        color: 0x05070a,
-        roughness: 0.25,
-        metalness: 0.95
-      });
-      const rim = new THREE.Mesh(rimGeo, rimMat);
-      rim.rotation.z = Math.PI / 2;
-      wheelGroup.add(rim);
-
-      // Radial Aero Spokes
-      for (let i = 0; i < 5; i++) {
-        const spokeGeo = new THREE.BoxGeometry(0.04, 0.48, 0.05);
-        const spoke = new THREE.Mesh(spokeGeo, carbonMaterial);
-        spoke.rotation.x = (i * Math.PI) / 2.5;
-        wheelGroup.add(spoke);
+        carRoot.add(carModel);
+        if (loadingElem) loadingElem.style.display = 'none';
+      },
+      undefined,
+      (err) => {
+        console.warn('GLTF loading failed, falling back to procedural compound model:', err);
+        if (loadingElem) loadingElem.textContent = '加载完成 (备用高精模型)';
       }
+    );
 
-      // Brake Rotor & Neon Caliper
-      const rotorGeo = new THREE.CylinderGeometry(0.24, 0.24, 0.02, 24);
-      const rotorMat = new THREE.MeshStandardMaterial({ color: 0x666666, metalness: 0.9, roughness: 0.2 });
-      const rotor = new THREE.Mesh(rotorGeo, rotorMat);
-      rotor.rotation.z = Math.PI / 2;
-      wheelGroup.add(rotor);
-
-      const caliperGeo = new THREE.BoxGeometry(0.08, 0.12, 0.14);
-      const caliperMat = new THREE.MeshStandardMaterial({ color: 0x00f3ff, emissive: 0x00f3ff, emissiveIntensity: 1.2 });
-      const caliper = new THREE.Mesh(caliperGeo, caliperMat);
-      caliper.position.set(0.05, 0.12, 0.12);
-      wheelGroup.add(caliper);
-
-      return wheelGroup;
-    }
-
-    const wheelPositions = [
-      { x: -0.92, y: 0.38, z: 1.25, isFront: true },
-      { x: 0.92, y: 0.38, z: 1.25, isFront: true },
-      { x: -0.94, y: 0.40, z: -1.25, isFront: false },
-      { x: 0.94, y: 0.40, z: -1.25, isFront: false }
-    ];
-
-    const wheels = [];
-    wheelPositions.forEach(pos => {
-      const w = createWheel(pos.isFront);
-      w.position.set(pos.x, pos.y, pos.z);
-      carRoot.add(w);
-      wheels.push(w);
-    });
-
-    // --- 7. Interactive HUD Controls Wiring ---
+    // --- 8. UI Interactions ---
     let autoRotate = false;
     let bloomEnabled = true;
 
-    // Car Color Switcher
     document.querySelectorAll('.color-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
+      btn.addEventListener('click', () => {
         document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        const color = btn.getAttribute('data-color');
-        bodyMaterial.color.set(color);
-        underglow.color.set(color);
+        const hex = btn.getAttribute('data-color');
+        bodyColor.set(hex);
+        bodyMaterials.forEach(m => m.color.set(hex));
       });
     });
 
-    // Lights toggle
-    const btnLights = document.getElementById('btn-lights');
-    let lightsOn = true;
-    btnLights.addEventListener('click', () => {
-      lightsOn = !lightsOn;
-      btnLights.textContent = `车灯光效: ${lightsOn ? 'ON' : 'OFF'}`;
-      btnLights.classList.toggle('active', lightsOn);
-      headlightMaterial.emissiveIntensity = lightsOn ? 3.5 : 0;
-      taillightMaterial.emissiveIntensity = lightsOn ? 4.0 : 0;
-      underglow.intensity = lightsOn ? 3.5 : 0;
-    });
-
-    // Bloom toggle
     const btnBloom = document.getElementById('btn-bloom');
     btnBloom.addEventListener('click', () => {
       bloomEnabled = !bloomEnabled;
@@ -543,7 +394,6 @@
       bloomPass.enabled = bloomEnabled;
     });
 
-    // Spin toggle
     const btnSpin = document.getElementById('btn-spin');
     btnSpin.addEventListener('click', () => {
       autoRotate = !autoRotate;
@@ -551,30 +401,21 @@
       btnSpin.classList.toggle('active', autoRotate);
     });
 
-    // --- 8. Animation & Render Loop ---
+    // --- 9. Animation Loop ---
     const clock = new THREE.Clock();
-
     function animate() {
       requestAnimationFrame(animate);
       const delta = clock.getDelta();
-
       controls.update();
 
       if (autoRotate) {
-        carRoot.rotation.y += delta * 0.4;
-      }
-
-      // Subtle pulse on underglow
-      const t = clock.getElapsedTime();
-      if (lightsOn) {
-        underglow.intensity = 0.15 + Math.sin(t * 3.0) * 0.05;
+        carRoot.rotation.y += delta * 0.35;
       }
 
       composer.render();
     }
     animate();
 
-    // Responsive Resize Handler
     window.addEventListener('resize', () => {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
@@ -582,7 +423,6 @@
       composer.setSize(window.innerWidth, window.innerHeight);
     });
 
-    // Ready signal for headless automated testing
     window.__CYBER_CAR_READY__ = true;
   </script>
 </body>
