@@ -50,7 +50,11 @@ gate_rules:
    - **三维场景与数字建模通用工程规范（全题材通用）**：
      - **反乐高积木/反简单几何体原则 (Anti-Primitive)**：无论构建何种题材（机械工业、交通工具、现代建筑、智慧城市、生物医疗、日常产品或概念场景），**严禁裸拼光滑基础立方体/球体/圆柱体**。必须使用复合造型（如 `TubeGeometry` 曲线管道、`LatheGeometry` 旋转体、`ExtrudeGeometry` 挤出截面、倒角微结构及多级层次装配体 Group），体现符合物理世界的结构层次。
      - **通用内存程序化贴图算法 (Procedural Canvas Textures)**：在免构建或无外部素材环境下，必须在内存中通过 HTML5 2D Canvas 动态绘制切线空间**法线贴图 (Normal Map)** 与 **粗糙度贴图 (Roughness Map)**。以 `rgb(128,128,255)` 为平整基准，根据题材绘制微观起伏坡度向量（如硬表面的接缝与紧固件、建筑的砌体微孔与拼缝、有机体的肌理噪点），赋予 PBR 物理材质真实的微观漫反射与高光，彻底消除塑料玩具感。
-     - **电影级后期泛光与光学辉光 (Optical Bloom)**：发光材质（自发光指示灯、车灯、发光线条、高亮核心、HUD 荧光）必须接入后期合成管线（`EffectComposer` + `RenderPass` + `UnrealBloomPass`），配合 `emissive` 自发光与合理的辉光阈值，产生真实镜头光学光晕漫射，杜绝平面实心死板单色。
+     - **电影级后期泛光与硬件多重采样抗锯齿 (Optical Bloom & Hardware MSAA)**：
+       - 发光材质必须接入后期合成管线（`EffectComposer` + `RenderPass` + `UnrealBloomPass`），配合 `emissive` 自发光与合理的辉光阈值产生真实镜头光晕；
+       - **抗锯齿防狗牙铁律**：Three.js 中一旦使用 `EffectComposer`，硬件自带的 `antialias: true` 会被彻底绕过！**必须显式为 `WebGLRenderTarget` 配置 `{ samples: 4 }`（WebGL 2 硬件 4x MSAA 抗锯齿）**，彻底消除发光圈与几何轮廓边缘的像素狗牙。
+     - **曲面法线平滑与反面片折痕 (Smooth Normal Shading)**：
+       - 严禁曲面呈现生硬的低模切片棱角；加载或创建模型后必须确保材质平滑着色（`material.flatShading = false`），并调用 `geometry.computeVertexNormals()` 重新插值法向量，使曲面受光与高光如丝般平滑。
      - **充沛的多重光照体系 (Multi-Light Hierarchy)**：配置半球漫反射天光 (HemisphereLight) 确保背光面通透不死黑，主平行光投射清晰阴影，逆向轮廓光 (Rim Light) 提拔空间纵深。
      - **外部高精模型支持与容灾 (Resilient External Assets)**：支持引入业界标准 `.gltf` / `.glb` / `.obj` 资产；使用前必须通过本地放置或 `vendor_assets` 下载缓存到本地，彻底消除 404 风险；且必须提供加载失败时的程序化备用降级渲染逻辑。
 

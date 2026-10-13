@@ -28,10 +28,13 @@
    - 严禁单一白光导致的平庸死白或大面积“黑黢麻黑”死黑面。
    - 标配多重视效布光：半球环境漫反射光 (HemisphereLight) 提亮暗部冷暖质感 + 主平行光 (DirectionalLight) 投射锐利阴影 + 侧逆边缘轮廓光 (Rim Light) 勾勒主体分离背景 + 局部点聚光。
    - 开启电影级色调映射 (`ACESFilmicToneMapping`) 与合理的曝光度，确保暗部有层次、高光不过曝。
-4. **光学后期泛光与辉光通道 (Optical Post-Processing & Emissive Bloom)**：
+4. **光学后期泛光与硬件多重采样抗锯齿 (Optical Post-Processing & Hardware MSAA)**：
    - 现实中任何发光物体（车灯、指示灯、霓虹、射线、全息屏、能量流），若无后期处理均为实心死板色块。
    - 必须接入后期合成管线 (`EffectComposer` + `RenderPass` + `UnrealBloomPass`)，配合材质自发光 (`emissive` + `emissiveIntensity > 1.0`)，呈现电影级真实光学辉光漫射。
-5. **外部模型高精资产容灾标准 (Resilient External Assets)**：
+   - **抗锯齿防狗牙铁律**：Three.js 中一旦挂载 `EffectComposer`，硬件自带的 `antialias: true` 会被彻底绕过失效！**必须显式为 `WebGLRenderTarget` 配置 `{ samples: 4 }`（WebGL 2 硬件 4x MSAA 抗锯齿）**，彻底消除发光圈、地台边缘与几何轮廓的像素锯齿。
+5. **曲面法线平滑插值 (Smooth Normal Shading)**：
+   - 严禁曲面呈现生硬的低模多边形切面折痕；加载或构建模型必须确保材质开启平滑着色（`flatShading: false`），并调用 `geometry.computeVertexNormals()` 插值平滑法线。
+6. **外部模型高精资产容灾标准 (Resilient External Assets)**：
    - 允许且鼓励使用工业级 `.gltf` / `.glb` / `.obj` 外部模型；
    - 必须通过本地资源管理或 `vendor_assets` 工具下载缓存到本地，严禁依赖不稳定的公网 CDN URL 导致 404 崩溃；
    - 必须编写异步加载容灾逻辑（Fallback），在外部资产缺失或加载超时时自动降级到程序化精细模型，确保 100% 正常运行。

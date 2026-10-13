@@ -314,7 +314,7 @@
             rimLight.position.set(-6, 5, -6);
             scene.add(rimLight);
 
-            // 7. Post-Processing (UnrealBloomPass for cinematic optical glow)
+            // 7. Post-Processing (UnrealBloomPass with WebGL 2 Hardware 4x MSAA Anti-Aliasing)
             const renderScene = new RenderPass(scene, camera);
             const bloomPass = new UnrealBloomPass(
                 new THREE.Vector2(window.innerWidth, window.innerHeight),
@@ -323,7 +323,14 @@
                 0.85  // threshold
             );
 
-            composer = new EffectComposer(renderer);
+            const renderTarget = new THREE.WebGLRenderTarget(
+                window.innerWidth,
+                window.innerHeight,
+                {
+                    samples: 4
+                }
+            );
+            composer = new EffectComposer(renderer, renderTarget);
             composer.addPass(renderScene);
             composer.addPass(bloomPass);
 
@@ -436,6 +443,13 @@
                         if (child.isMesh) {
                             child.castShadow = true;
                             child.receiveShadow = true;
+                            if (child.material) {
+                                child.material.flatShading = false;
+                                child.material.needsUpdate = true;
+                            }
+                            if (child.geometry) {
+                                child.geometry.computeVertexNormals();
+                            }
                         }
                     });
 
