@@ -1,0 +1,224 @@
+[
+  {
+    "time": "2026-10-14 00:24:58",
+    "project": "tmpafsl9h8x",
+    "task": "测试任务X",
+    "failure_summary": "conditions gate failed: mock"
+  },
+  {
+    "time": "2026-10-14 00:25:23",
+    "project": "tmpc1erzr_2",
+    "task": "测试任务X",
+    "failure_summary": "conditions gate failed: mock"
+  },
+  {
+    "time": "2026-10-14 00:25:47",
+    "project": "tmp8bm83r3u",
+    "task": "测试任务X",
+    "failure_summary": "conditions gate failed: mock"
+  },
+  {
+    "time": "2026-10-14 02:14:58",
+    "project": "tmpiaaaiwk2",
+    "task": "测试任务X",
+    "failure_summary": "conditions gate failed: mock"
+  },
+  {
+    "time": "2026-10-14 02:37:05",
+    "project": "atui_harness",
+    "task": "第五阶段迭代（失败升级策略+分析师会诊首测）：1) 【空间合理性整改】 Horse.glb 当前放置在 y=1.0（位于水面之下，陆地动物入水），必须将 Horse 及所有陆地资产重新放置到水面 y 阈值之上的陆地位置（先从 terrain.js 确认水面/地面实际高度），并核对每个资产的放置坐标与其环境属性自洽；2) 【真实感升级】vegetation.js 中的程序化生成树木呈现积木感，必须用",
+    "failure_summary": "conditions gate failed: [file_count_min] matched 0 files in '.' by '*.glb', required >= 10; [code_reference_integrity] found 9 refs (required >= 1); MISSING TARGETS: ['models/Flamingo.glb', 'models/Parrot.glb', 'models/RobotExpressive.glb', 'models/Stork.glb', 'models/catv2.glb', 'models/cottage.glb', 'models/duck.glb', 'models/ferrari.glb']"
+  },
+  {
+    "time": "2026-10-14 03:12:58",
+    "project": "tmpc_v66yy1",
+    "task": "测试任务X",
+    "failure_summary": "conditions gate failed: mock"
+  },
+  {
+    "time": "2026-10-14 03:17:42",
+    "project": "tmpt4eesqgp",
+    "task": "测试任务X",
+    "failure_summary": "conditions gate failed: mock"
+  },
+  {
+    "time": "2026-10-14 03:24:46",
+    "project": "tmpzwv34xvx",
+    "task": "测试任务X",
+    "failure_summary": "conditions gate failed: mock"
+  },
+  {
+    "time": "2026-10-14 03:24:52",
+    "project": "tmpdaia6zvx",
+    "task": "测试任务X",
+    "failure_summary": "conditions gate failed: mock"
+  },
+  {
+    "time": "2026-10-14 04:33:03",
+    "project": "atui_harness",
+    "task": "第五阶段迭代续（升级策略生效验证）：磁盘 models/ 已有 48 个 glb（含 oak-tree/pine-tree/garden-bench/camp-fire 等 8 个新语义化资产），但代码仅引用 6 个，硬指标：models/*.glb 代码引用 >=10 且每个引用真实存在。任务：1) 将新语义化资产接入场景：oak-tree/pine-tree/pine-sapling 替换 v",
+    "failure_summary": "conditions gate failed: [file_count_min] matched 1 files in 'models' by '*.glb' (recursive), required >= 10; [code_reference_integrity] found 18 refs (required >= 10); MISSING TARGETS: ['models/Flamingo.glb', 'models/Parrot.glb', 'models/RobotExpressive.glb', 'models/Stork.glb', 'models/bush-shrub.glb', 'models/camp-fire.glb', 'models/catv2.glb', 'models/cottage.glb']"
+  },
+  {
+    "time": "2026-10-14 07:04:16",
+    "project": "tmpbonljnem",
+    "task": "测试任务X",
+    "failure_summary": "conditions gate failed: mock"
+  },
+  {
+    "time": "2026-10-14 07:20:06",
+    "project": "tmpk4d6hieq",
+    "task": "测试任务X",
+    "failure_summary": "conditions gate failed: mock"
+  },
+  {
+    "time": "2026-10-14 07:21:58",
+    "project": "tmpcxr31pxx",
+    "task": "测试任务X",
+    "failure_summary": "conditions gate failed: mock"
+  },
+  {
+    "time": "2026-10-14 07:23:08",
+    "project": "tmperspu6tu",
+    "task": "测试任务X",
+    "failure_summary": "conditions gate failed: mock"
+  },
+  {
+    "time": "2026-10-14 07:24:30",
+    "project": "tmp_9uf25fj",
+    "task": "测试任务X",
+    "failure_summary": "conditions gate failed: mock"
+  },
+  {
+    "time": "2026-10-14 07:24:41",
+    "project": "tmpvey8uqac",
+    "task": "测试任务X",
+    "failure_summary": "conditions gate failed: mock"
+  },
+  {
+    "time": "2026-10-14 07:25:09",
+    "project": "tmp3_wm2aax",
+    "task": "测试任务X",
+    "failure_summary": "conditions gate failed: mock"
+  },
+  {
+    "time": "2026-10-14 07:25:18",
+    "project": "tmp9w2yb08t",
+    "task": "测试任务X",
+    "failure_summary": "conditions gate failed: mock"
+  },
+  {
+    "time": "2026-10-14 07:27:21",
+    "project": "atui_harness",
+    "task": "第五阶段迭代续2（部分成功保留策略首测）：models/ 已有 48 个 glb，硬指标：代码引用 >=10 且引用真实存在。任务：1) 把 oak-tree/pine-tree/pine-sapling 接入 vegetation.js 替换程序化积木树；garden-bench/wooden-bench/camp-fire/rustic-well/stone-arch/wooden-fence",
+    "failure_summary": "conditions gate failed: [code_reference_integrity] found 23 refs (required >= 1); MISSING TARGETS: ['models/Flamingo.glb', 'models/Horse.glb', 'models/Parrot.glb', 'models/RobotExpressive.glb', 'models/Stork.glb', 'models/bush-shrub.glb', 'models/camp-fire.glb', 'models/catv2.glb']; [web_runtime_clean] console_errors=0, network_failures=2; SAMPLES: ; "
+  },
+  {
+    "time": "2026-10-14 07:31:18",
+    "project": "tmpivcd6xgf",
+    "task": "测试任务X",
+    "failure_summary": "conditions gate failed: mock"
+  },
+  {
+    "time": "2026-10-14 07:32:16",
+    "project": "tmpbf0bt94o",
+    "task": "测试任务X",
+    "failure_summary": "conditions gate failed: mock"
+  },
+  {
+    "time": "2026-10-14 07:32:36",
+    "project": "tmp7vy9wwg4",
+    "task": "测试任务X",
+    "failure_summary": "conditions gate failed: mock"
+  },
+  {
+    "time": "2026-10-14 07:36:51",
+    "project": "tmpkduqrian",
+    "task": "测试任务X",
+    "failure_summary": "conditions gate failed: mock"
+  },
+  {
+    "time": "2026-10-14 07:36:59",
+    "project": "tmp9qg9k207",
+    "task": "测试任务X",
+    "failure_summary": "conditions gate failed: mock"
+  },
+  {
+    "time": "2026-10-14 07:37:09",
+    "project": "tmp0mbn5_88",
+    "task": "测试任务X",
+    "failure_summary": "conditions gate failed: mock"
+  },
+  {
+    "time": "2026-10-14 07:37:14",
+    "project": "tmpxzbo23aa",
+    "task": "测试任务X",
+    "failure_summary": "conditions gate failed: mock"
+  },
+  {
+    "time": "2026-10-14 07:37:31",
+    "project": "tmpmjgaga2n",
+    "task": "测试任务X",
+    "failure_summary": "conditions gate failed: mock"
+  },
+  {
+    "time": "2026-10-14 07:37:34",
+    "project": "tmp7tbg5a4m",
+    "task": "测试任务X",
+    "failure_summary": "conditions gate failed: mock"
+  },
+  {
+    "time": "2026-10-14 07:37:57",
+    "project": "tmpwf0697rb",
+    "task": "测试任务X",
+    "failure_summary": "conditions gate failed: mock"
+  },
+  {
+    "time": "2026-10-14 07:38:13",
+    "project": "tmpbr97k5wa",
+    "task": "测试任务X",
+    "failure_summary": "conditions gate failed: mock"
+  },
+  {
+    "time": "2026-10-14 07:38:24",
+    "project": "tmpw78ps_a_",
+    "task": "测试任务X",
+    "failure_summary": "conditions gate failed: mock"
+  },
+  {
+    "time": "2026-10-14 07:38:25",
+    "project": "tmpn42p8h7d",
+    "task": "测试任务X",
+    "failure_summary": "conditions gate failed: mock"
+  },
+  {
+    "time": "2026-10-14 07:38:34",
+    "project": "tmphpzmd539",
+    "task": "测试任务X",
+    "failure_summary": "conditions gate failed: mock"
+  },
+  {
+    "time": "2026-10-14 07:38:48",
+    "project": "tmpz89_ba98",
+    "task": "测试任务X",
+    "failure_summary": "conditions gate failed: mock"
+  },
+  {
+    "time": "2026-10-14 07:39:19",
+    "project": "tmp8ewesbkc",
+    "task": "测试任务X",
+    "failure_summary": "conditions gate failed: mock"
+  },
+  {
+    "time": "2026-10-14 07:50:18",
+    "project": "atui_harness",
+    "task": "第六阶段迭代（根目录修复后的首个验证轮）：上一轮引用已达23个但被错误门禁冤杀回滚。本轮目标：1) 核对当前所有 models/*.glb 代码引用完整且大小写与磁盘一致（含 Flamingo/Horse/Parrot/Stork 及 oak-tree/pine-tree/garden-bench 等新资产），保证页面加载零控制台报错；2) Horse.glb 移到陆地（先确认 terrain.j",
+    "failure_summary": "partial: "
+  },
+  {
+    "time": "2026-10-14 07:50:19",
+    "project": "tmpfesiipqf",
+    "task": "测试任务X",
+    "failure_summary": "conditions gate failed: mock"
+  }
+]
