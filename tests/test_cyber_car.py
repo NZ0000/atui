@@ -13,16 +13,13 @@ def test_cyber_car_files_exist():
 def test_index_html_structure():
     """验证 index.html 存在并包含 Three.js、Postprocessing 和核心交互脚本契约"""
     index_path = "demo_cyber_car/index.html"
-    # 如果此时文件尚未创建，可先跳过或断言其在实现后必存在
-    if os.path.exists(index_path):
-        with open(index_path, "r", encoding="utf-8") as f:
-            content = f.read()
-        assert "three.module.js" in content, "index.html 必须引入 Three.js 模块"
-        assert "UnrealBloomPass" in content, "index.html 必须引入 UnrealBloomPass 辉光后期通道"
-        assert "OrbitControls" in content, "index.html 必须引入 OrbitControls 轨道控制器"
-        assert "Canvas" in content or "canvas" in content, "必须包含内存程序化 Canvas 贴图生成逻辑"
-    else:
-        pytest.skip("index.html 尚在规划阶段（TDD RED），实现后将自动通过该断言")
+    assert os.path.exists(index_path), f"入口文件 {index_path} 必须存在"
+    with open(index_path, "r", encoding="utf-8") as f:
+        content = f.read()
+    assert "three.module.js" in content, "index.html 必须引入 Three.js 模块"
+    assert "UnrealBloomPass" in content, "index.html 必须引入 UnrealBloomPass 辉光后期通道"
+    assert "OrbitControls" in content, "index.html 必须引入 OrbitControls 轨道控制器"
+    assert "Canvas" in content or "canvas" in content, "必须包含内存程序化 Canvas 贴图生成逻辑"
 
 def test_acceptance_criteria_and_plan_exist():
     """验证规划方案与原子化燃尽清单已正确生成"""

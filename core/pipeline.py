@@ -50,6 +50,24 @@ class PipelineOrchestrator:
             {"stage": "pipeline_start", "task": task, "output_file": output_file, "model": active_model}
         )
 
+        # Clean stale deliverables from previous pipeline runs
+        from core.project import get_current_project
+        proj = get_current_project()
+        stale_files = [
+            "deliverables/code_changes.md",
+            "deliverables/test_report.md",
+            "deliverables/design_audit.md",
+            "deliverables/acceptance_criteria.md",
+            "deliverables/plan.md"
+        ]
+        for sf in stale_files:
+            s_abs = os.path.join(proj.path, sf)
+            if os.path.exists(s_abs):
+                try:
+                    os.remove(s_abs)
+                except Exception:
+                    pass
+
         # Stage 0: Environment Probe & Base Setup (DevOps)
         try:
             devops_path = self._get_agent_path("devops")
@@ -152,6 +170,17 @@ class PipelineOrchestrator:
             if verif["passed"]:
                 # Visual aesthetic audit if designer agent exists and task touches UI/3D
                 if any(w in task.lower() for w in ["3d", "ui", "页面", "html", "web", "前端", "界面", "视觉", "审美"]):
+                    # 1. Verify target HTML file actually exists on disk
+                    target_html_candidates = ["index.html"]
+                    html_found = False
+                    for root, _, files in os.walk(proj.path):
+                        if any(c in files for c in target_html_candidates):
+                            html_found = True
+                            break
+                    if not html_found:
+                        verif["passed"] = False
+                        verif["error_details"] = "关键目标前端网页文件（如 index.html）尚未在工作区生成，代码实现缺失！"
+
                     try:
                         designer_path = self._get_agent_path("designer")
                         default_bus.publish(EventType.PIPELINE_STEP, {"stage": "design_audit", "role": "designer"})
@@ -160,8 +189,9 @@ class PipelineOrchestrator:
                         design_report = "deliverables/design_audit.md"
                         design_task = (
                             f"任务目标：{task}\n"
-                            f"请调用 browser_test 截取无头浏览器真实渲染截图，进行视觉审美打分与审查（光影充足、无死黑、排版优雅）。\n"
+                            f"请调用 browser_test 截取真实视口截图，进行视觉审美打分与审查（光影充足、无死黑、排版优雅）。\n"
                             f"核查 deliverables/acceptance_criteria.md 中的审美指标并进行核验打勾。\n"
+                            f"若目标页面不存在或截屏失败，首行必须写明【验收结果：REJECT 驳回】并详述原因；若合格则写明【验收结果：PASS】。\n"
                             f"将审美审查结论写入：{design_report}"
                         )
                         designer_harness.run(design_task, output_file=design_report)
@@ -192,8 +222,11 @@ class PipelineOrchestrator:
                             try:
                                 with open(design_report_path, "r", encoding="utf-8") as df:
                                     d_content = df.read()
-                                reject_keywords = ["驳回", "reject", "不合格", "未达标", "严重缺陷", "塑料玩具感", "死黑严重"]
+                                reject_keywords = ["驳回", "reject", "不合格", "未达标", "严重缺陷", "塑料玩具感", "死黑严重", "未通过", "不存在", "缺失", "报错"]
                                 is_rejected = any(kw in d_content.lower() for kw in reject_keywords)
+                                if is_rejected:
+                                    verif["passed"] = False
+                                    verif["error_details"] = f"视觉审美审计未通过：\n{d_content[:300]}"
                                 for it in cl.items:
                                     if it.category == "aesthetic":
                                         if is_rejected:

@@ -89,7 +89,13 @@ def read_path(path: str, start_line: Optional[int] = None, end_line: Optional[in
         return make_result(False, error=f"Failed to read file '{path}': {e}")
 
 def execute(params: Dict[str, Any]) -> Dict[str, Any]:
-    path = params.get("path")
+    path = (
+        params.get("path")
+        or params.get("file")
+        or params.get("file_path")
+        or params.get("filename")
+        or params.get("target")
+    )
     if not path:
         return make_result(False, error="Parameter 'path' is required.")
     start_line = params.get("start_line")

@@ -113,10 +113,20 @@ def write_file(
     })
 
 def execute(params: Dict[str, Any]) -> Dict[str, Any]:
-    path = params.get("path")
+    path = (
+        params.get("path")
+        or params.get("file")
+        or params.get("file_path")
+        or params.get("filename")
+        or params.get("target")
+    )
     if not path:
         return make_result(False, error="Parameter 'path' is required.")
-    content = params.get("content")
+    content = (
+        params.get("content")
+        if "content" in params
+        else (params.get("text") or params.get("code") or params.get("body") or "")
+    )
     mode = params.get("mode", "overwrite")
     target_chunk = params.get("target_chunk")
     replacement_chunk = params.get("replacement_chunk")

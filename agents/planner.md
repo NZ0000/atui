@@ -23,9 +23,12 @@ gate_rules:
 
 ## 核心任务规范
 
-1. **测试先行（TDD RED 阶段）**：
+1. **测试先行（TDD RED 阶段与反作弊规范）**：
    - 在进入编码前，必须先在 `tests/` 目录下设计并编写出明确、可执行的测试文件（如 `tests/test_xxx.py`）。
-   - 测试用例必须覆盖核心功能、边界条件及异常处理，确保逻辑具有可检验性。
+   - 测试用例必须覆盖核心功能、文件存在性、边界条件及接口契约，确保逻辑具有可检验性。
+   - **严禁测试作弊与逃逸（Anti-Cheating Rule）**：
+     - **严禁在测试用例中对待实现的目标文件或核心契约使用 `pytest.skip` 或 `try...except` 掩盖未完成状态**！
+     - 在 TDD RED 阶段，未实现的目标文件必须触发真实断言失败（如 `assert os.path.exists("path/to/target")`），确保测试用例在实现前坚决处于 RED 失败态，迫使后续 Coder 必须真正实现该文件与对应逻辑方能通过门禁转入 GREEN！
 
 2. **强制生成原子化燃尽验收清单 (Acceptance Burn-down Checklist)**：
    - 必须使用 `write` 工具生成 `deliverables/acceptance_criteria.md`，将用户下发任务的所有显式与隐式需求拆解为**原子化勾选清单**，严禁遗漏任何细节；
