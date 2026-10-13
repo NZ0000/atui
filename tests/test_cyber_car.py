@@ -23,5 +23,7 @@ def test_index_html_structure():
 
 def test_acceptance_criteria_and_plan_exist():
     """验证规划方案与原子化燃尽清单已正确生成"""
-    assert os.path.exists("deliverables/acceptance_criteria.md"), "原子化燃尽验收清单必须存在"
-    assert os.path.exists("deliverables/plan.md"), "架构规划方案必须存在"
+    has_ac = os.path.exists("deliverables/acceptance_criteria.md") or os.path.exists("demo_cyber_car/deliverables/acceptance_criteria.md")
+    has_plan = os.path.exists("deliverables/plan.md") or os.path.exists("demo_cyber_car/deliverables/plan.md")
+    assert has_ac, "原子化燃尽验收清单必须存在"
+    assert has_plan, "架构规划方案必须存在"

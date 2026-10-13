@@ -398,6 +398,7 @@
                 0.4,
                 0.7
             );
+            bloomPass.renderToScreen = true;
             composer.addPass(bloomPass);
 
             loadHelmetModel();
@@ -417,7 +418,7 @@
             const statusEl = document.getElementById('loader-status');
 
             loader.load(
-                './models/DamagedHelmet.gltf',
+                './models/DamagedHelmet.glb',
                 (gltf) => {
                     helmetGroup = gltf.scene;
                     helmetGroup.position.set(0, 0, 0);
@@ -626,7 +627,7 @@
             }
 
             controls.update();
-            composer.render();
+            renderer.render(scene, camera);
         }
     </script>
 </body>
