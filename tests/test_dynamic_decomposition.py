@@ -147,6 +147,54 @@ def test_fix_worker_requires_real_file_modification():
         assert "未实际修改" in res["error"]
 
 
+def test_record_lesson_and_git_rollback_scope():
+    """Failures must land in knowledge/lessons.json; bare rollback must stay project-scoped."""
+    import tempfile
+    pipeline = ConcurrentModularPipeline()
+
+    # --- lesson recording ---
+    with tempfile.TemporaryDirectory() as tmp:
+        pipeline._record_lesson("测试任务X", "conditions gate failed: mock", tmp)
+        import sys as _sys
+        _sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "core"))
+        import concurrent_pipeline as _cp  # knowledge path is harness-level, not project-level
+        kb = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(_cp.__file__))), "knowledge", "lessons.json")
+        with open(kb, "r", encoding="utf-8") as f:
+            entries = json.load(f)
+        assert any("测试任务X" in e["task"] for e in entries)
+
+    # --- bare git_tool rollback must be scoped, never repo-wide ---
+    import tools
+    tools.discover_tools()
+    with tempfile.TemporaryDirectory() as tmp_repo:
+        def _git(*args):
+            import subprocess as _sp
+            return _sp.run(["git", *args], cwd=tmp_repo, capture_output=True, text=True)
+        _git("init", "-q")
+        _git("config", "user.email", "t@t"); _git("config", "user.name", "t")
+        os.makedirs(os.path.join(tmp_repo, "demo_proj"))
+        os.makedirs(os.path.join(tmp_repo, "agents"))
+        open(os.path.join(tmp_repo, "agents", "prompt.md"), "w").close()
+        p = os.path.join(tmp_repo, "demo_proj", "index.html")
+        open(p, "w").close()
+        _git("add", "-A"); _git("commit", "-qm", "init")
+        # modify both files (tracked)
+        open(p, "w").write("<html>changed</html>")
+        open(os.path.join(tmp_repo, "agents", "prompt.md"), "w").write("# tampered")
+        # emulate active project via condition_gate's root detection: patch env-free path
+        import tools.condition_gate as _cg
+        orig = _cg._get_project_root
+        _cg._get_project_root = lambda: os.path.join(tmp_repo, "demo_proj")
+        try:
+            res = tools.execute_tool("git_tool", {"action": "rollback", "cwd": tmp_repo})
+            assert res["success"] is True
+        finally:
+            _cg._get_project_root = orig
+        restored = open(p).read()
+        untouched = open(os.path.join(tmp_repo, "agents", "prompt.md")).read()
+        assert restored == "" and untouched == "# tampered"
+
+
 def test_file_signature_helper():
     """_file_signature returns None for missing files and changes when content changes."""
     import tempfile

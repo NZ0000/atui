@@ -42,7 +42,7 @@ class ConcurrentModularPipeline:
         agents_dir: str = "agents",
         model: Optional[str] = None,
         max_workers: int = 4,
-        max_repair_loops: int = 3
+        max_repair_loops: int = 4
     ):
         self.agents_dir = os.path.abspath(agents_dir)
         self.model = model
@@ -934,9 +934,28 @@ class ConcurrentModularPipeline:
                 default_bus.publish(EventType.PIPELINE_STEP, {
                     "stage": "condition_gate_reject",
                     "failures": failure_text,
-                    "action": "repair_wave"
+                    "action": "analyst_consult_then_repair_wave"
                 })
-                # One repair wave: re-dispatch fix workers with failure evidence injected
+                # Analyst consult: diagnose WHY conditions failed and prescribe
+                # concrete remediation (analyst has analyzer/web_search knowledge).
+                consult_text = ""
+                try:
+                    consult_harness = AgentHarness(
+                        Role.from_file(self._get_agent_path("analyst")), model=active_model
+                    )
+                    consult_res = consult_harness.run(
+                        f"【验收门禁失败会诊】\n迭代目标：{task}\n\n"
+                        f"硬性条件门禁失败明细：\n{failure_text}\n\n"
+                        f"请诊断失败根因（如：外部资产下载失败/代码未接入/指标不合理），"
+                        f"并给出每个失败项的具体补救指令（可直接执行的代码级/资产级动作），"
+                        f"不超过 600 字。必要时调用 analyzer 检索代码与知识库、web_search 查资料。"
+                    )
+                    consult_text = (consult_res.get("last_message", "") or "")[:1500]
+                except Exception as exc:
+                    default_bus.publish(EventType.PIPELINE_STEP, {
+                        "stage": "consult_error", "error": str(exc)
+                    })
+                # One repair wave: re-dispatch fix workers with failure evidence + remediation
                 repair_results = {}
                 with concurrent.futures.ThreadPoolExecutor(
                     max_workers=min(self.max_workers, len(target_files))
@@ -945,7 +964,8 @@ class ConcurrentModularPipeline:
                         executor.submit(
                             self._run_single_fix_pipeline,
                             target_file=f,
-                            task=task + f"\n\n【硬性条件门禁驳回记录，必须针对性解决】\n{failure_text}",
+                            task=task + f"\n\n【硬性条件门禁驳回记录，必须针对性解决】\n{failure_text}"
+                                 + (f"\n\n【分析师会诊补救指令】\n{consult_text}" if consult_text else ""),
                             analysis_content=analysis_content,
                             project_path=proj.path,
                             active_model=active_model,
@@ -1064,6 +1084,7 @@ class ConcurrentModularPipeline:
                 if not conditions_passed else
                 f"fix workers failed: {failed_files}"
             )
+            self._record_lesson(task, reason, proj.path)
             default_bus.publish(EventType.GIT_ACTION, {
                 "action": "rollback_trigger", "reason": reason
             })
@@ -1238,6 +1259,38 @@ class ConcurrentModularPipeline:
         spec["conditions"] = conds
         return spec
 
+    def _record_lesson(self, task: str, failure_summary: str, project_path: str = "") -> None:
+        """
+        Auto-append a failure lesson to the harness knowledge base so future
+        query_knowledge / analyst consults can retrieve what went wrong and how.
+        Organizational memory: failures must compound into experience.
+        """
+        try:
+            kb_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                   "knowledge", "lessons.json")
+            os.makedirs(os.path.dirname(kb_path), exist_ok=True)
+            entries = []
+            if os.path.exists(kb_path):
+                try:
+                    with open(kb_path, "r", encoding="utf-8") as f:
+                        entries = json.load(f)
+                except Exception:
+                    entries = []
+            entries.append({
+                "time": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "project": os.path.basename(project_path) if project_path else "",
+                "task": task[:200],
+                "failure_summary": failure_summary[:600],
+            })
+            entries = entries[-200:]
+            with open(kb_path, "w", encoding="utf-8") as f:
+                json.dump(entries, f, ensure_ascii=False, indent=2)
+            default_bus.publish(EventType.PIPELINE_STEP, {
+                "stage": "lesson_recorded", "kb": "knowledge/lessons.json"
+            })
+        except Exception:
+            pass
+
     def _verify_check_scripts(self, project_path: str, report_file: str) -> str:
         """
         Hand-over gate for temp check scripts declared by agents.
@@ -1328,6 +1381,27 @@ class ConcurrentModularPipeline:
             )
             if last_error:
                 coder_task += f"\n\n上一轮审查驳回原因：{last_error}\n请有针对性地修正！"
+                # Escalation playbook: each rejected round unlocks wider tactics so
+                # the worker never stalls on the same failed approach.
+                if loop >= 2:
+                    coder_task += (
+                        f"\n\n【升级策略（第 {loop} 轮，上轮方案已被驳回，禁止原样重试）】\n"
+                        f"- 先调用 condition_gate 工具（conditions_file=deliverables/check_conditions.json）自评当前代码，"
+                        f"对照每条失败项逐条映射到具体代码动作，列清单后再动手。\n"
+                        f"- 调用 web_search 检索相关技术资料与解决方案（如实现思路、现成资产下载源）。\n"
+                        f"- 重新逐字阅读驳回原因，把每个失败项映射到一个具体代码动作，逐条列出再动手。"
+                    )
+                if loop >= 3:
+                    coder_task += (
+                        f"\n- 必须更换实现策略：用 vendor_assets 更换/补充资产下载源，"
+                        f"或调整技术路线（如改用其它 Three.js 特性、更换算法、调整资源结构）；"
+                        f"连续多轮用同一招失败会被判定为无效循环。"
+                    )
+                if loop >= 4:
+                    coder_task += (
+                        f"\n- 最后手段：若某硬指标经多轮尝试确实无法达成（如外部资源不可达），"
+                        f"在报告中明确说明障碍与已尝试的证据，并把已完成的部分做扎实，不要留半成品。"
+                    )
 
             code_res = worker_coder.run(coder_task, output_file=coder_out)
             if not code_res.get("success"):

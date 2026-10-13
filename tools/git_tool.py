@@ -143,13 +143,28 @@ def git_operations(
                     return make_result(True, data={"action": "rollback", "path": path, "removed_untracked": True})
             return make_result(True, data={"action": "rollback", "path": path, "message": "Path did not exist."})
         else:
-            # Revert tracked modifications
+            # Revert tracked modifications — NEVER repo-wide. Scope to the active
+            # project dir only, so harness files and other projects can't be wiped
+            # by an agent or gate invoking rollback without explicit arguments.
             has_head = (_run_git(["rev-parse", "--verify", "HEAD"], repo_dir).returncode == 0)
             if has_head:
-                p_restore = _run_git(["restore", "."], repo_dir)
+                try:
+                    from tools.condition_gate import _get_project_root
+                    project_root = _get_project_root()
+                except Exception:
+                    project_root = None
+                scope = "."
+                if project_root:
+                    try:
+                        rel = os.path.relpath(project_root, repo_dir)
+                        if rel and rel != "." and not rel.startswith("..") and os.path.exists(os.path.join(repo_dir, rel)):
+                            scope = rel
+                    except Exception:
+                        scope = "."
+                p_restore = _run_git(["restore", scope], repo_dir)
                 return make_result(True, data={
                     "action": "rollback",
-                    "message": "Reverted modified tracked files.",
+                    "message": f"Reverted modified tracked files (scoped to '{scope}'; harness files untouched).",
                     "restore": p_restore.stdout.strip()
                 })
             else:

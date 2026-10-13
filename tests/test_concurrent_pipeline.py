@@ -11,7 +11,7 @@ from core.concurrent_pipeline import ConcurrentModularPipeline
 def test_concurrent_pipeline_initialization():
     pipeline = ConcurrentModularPipeline(agents_dir="agents", max_workers=4)
     assert pipeline.max_workers == 4
-    assert pipeline.max_repair_loops == 3
+    assert pipeline.max_repair_loops == 4
     assert os.path.exists(pipeline._get_agent_path("planner"))
     assert os.path.exists(pipeline._get_agent_path("coder"))
     assert os.path.exists(pipeline._get_agent_path("reviewer"))
