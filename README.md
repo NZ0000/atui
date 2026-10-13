@@ -75,26 +75,35 @@ Python 是全球 AI、数据科学、自动化与工程运维领域无可争议�
 ---
 
 ### 5. 全生命周期多智能体流水线 (Multi-Agent Lifecycle Pipeline)
-系统内置完备的五大角色智能体，协同完成复杂软件工程闭环：
-- 🧭 **规划与架构师 (Planner)**：头脑风暴、分析参考代码模式、提出功能方案，并**先期设计并编写 TDD 测试用例**。
-- 💻 **编码与重构工程师 (Coder)**：遵循测试用例与项目规则，执行最小化高内聚编码，消除红灯。
-- 🧪 **质量测试专家 (Tester)**：执行 Python AST 语法解析、`py_compile` 静态编译检查及 `pytest`/`unittest` 完整用例，输出详细错误诊断。
+系统内置完备的八大角色智能体，协同完成复杂软件工程闭环：
+- 🌐 **部署运维与环境工程师 (DevOps)**：负责环境基线探针、依赖包自动化安装、网络通信底座（HTTP 静态伺服、WebSocket、MQTT）搭建与端口守护，彻底消除本地 `file:///` CORS 跨域痛点。
+- 🧭 **规划与架构师 (Planner)**：头脑风暴、分析参考代码模式、先期设计编写 TDD 测试用例，并**强制分解原子化燃尽验收清单 (`acceptance_criteria.md`)**。
+- 💻 **全栈编码与重构工程师 (Coder)**：遵循测试用例与项目规则，执行最小化高内聚编码，消除红灯。
+- 🧪 **全栈质量测试专家 (Tester)**：执行 Python AST / `py_compile` / `pytest` / `unittest`、Web 语法校验 (`web_validator`)、无头 Chromium 控制台报错拦截与测试诊断。
+- 🎨 **视觉设计与审美总监 (Designer)**：负责设计规范定义、文生图素材策划、调用无头浏览器截屏并依托多模态视觉感知进行审美审查打勾，坚决杜绝死黑与辣眼睛界面。
 - 🌿 **版本控制与安全审计 (Git Agent)**：审计代码 Diff，通过 TDD 门禁后执行原子化 Commit；若出现破坏性变更或测试未过，果断触发 **Git Rollback 自动回退**。
 - 📦 **收尾交付与知识沉淀 (Delivery)**：复盘全流程，梳理核心经验、踩坑要点（Gotchas）、使用指南并沉淀归档交付资产。
-- 🧠 **主调度大脑 (Orchestrator)**：统筹上述各子角色流转与状态协调。
+- 🧠 **主调度大脑 (Orchestrator)**：统筹上述各子角色流转、自修复循环与燃尽门禁协调。
 
 ---
 
-### 6. 严苛的 TDD 质量门禁与自修复闭环 (TDD Gate & Self-Repair)
+### 6. 严苛的 TDD 质量门禁与燃尽验收闭环 (Burn-Down Acceptance & Self-Repair)
 - **无测试，不编码**：强制实行 TDD 先行，未编写对应测试用例禁止合并。
-- **双向自修复循环**：当 Tester 发现测试失败时，将失败堆栈与诊断信息精准反馈给 Coder，智能体在两者之间循环修复（默认上限 5 轮），直至测试全绿。
+- **原子化燃尽验收清单 (Acceptance Burn-down Checklist)**：Planner 分解出的功能、环境与审美清单必须逐项核验；未满足项拒绝退出，自动携带剩余清单打回 Coder 继续修复，直至 100% 燃尽！
+- **双向自修复循环**：当 Tester 或 Designer 发现功能缺陷或视觉软缺陷时，将详细诊断反馈给 Coder，智能体在两者之间循环修复（默认上限 5 轮），直至测试全绿且视觉达标。
 - **后置回归与 Git 自动回退保护**：合并代码后重新执行全局回归测试；若有任何用例失败，立即调用 `git restore` / 回退操作，保护代码仓库绝对安全。
 
 ---
 
 ### 7. 万物皆插件，万物皆接口 (Everything is a Plugin)
-- 所有 Function Calling 工具均置于 `tools/` 目录，符合独立脚本规范。
-- **双模调用**：每个工具既可以被 Python 作为函数导入调用 (`execute(params)`)，也可以直接在终端通过 CLI 命令参数调用 (`python tools/read.py --path ...`)。
+- 所有 Function Calling 工具均置于 `tools/` 目录，符合独立脚本规范：
+  - `read` / `write` / `run`：文件与终端命令基础三件套（`write` 原生支持自动递归创建父目录）。
+  - `batch_run`：支持单轮次批量提交执行多个工具调用，大幅缩减交互轮次与延迟。
+  - `web_validator`：HTML5 标签树闭合、CSS 语法与 Node.js V8 级 JavaScript 语法深度检测。
+  - `browser_test`：无头 Chromium 运行、WebGL 软光栅化渲染、控制台报错实时捕获与视口截图。
+  - `env_manager`：环境系统探针、本地 HTTP / WebSocket / MQTT 背景服务编排与守护。
+  - `vendor_assets`：离线前端依赖本地落地与管理，杜绝外部 CDN 单点断流。
+- **双模调用**：每个工具既可以被 Python 作为函数导入调用 (`execute(params)`)，也可以直接在终端通过 CLI 命令参数调用。
 - **即插即用**：放入新的 Python 脚本即可被注册中心自动发现与热加载。
 
 ---

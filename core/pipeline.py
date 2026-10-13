@@ -50,7 +50,24 @@ class PipelineOrchestrator:
             {"stage": "pipeline_start", "task": task, "output_file": output_file, "model": active_model}
         )
 
-        # Stage 1: Planning & TDD Test Design
+        # Stage 0: Environment Probe & Base Setup (DevOps)
+        try:
+            devops_path = self._get_agent_path("devops")
+            default_bus.publish(EventType.PIPELINE_STEP, {"stage": "devops_setup", "role": "devops"})
+            devops_role = Role.from_file(devops_path)
+            devops_harness = AgentHarness(devops_role, model=active_model)
+            devops_output = "deliverables/deployment_report.md"
+            devops_task = (
+                f"任务目标：{task}\n"
+                f"请调用 env_manager 探查系统环境基线，并在需要时启动本地服务（如 HTTP 避免 file:// CORS），"
+                f"输出环境就绪报告至：{devops_output}"
+            )
+            devops_res = devops_harness.run(devops_task, output_file=devops_output)
+            stage_records.append({"stage": "devops", "result": devops_res})
+        except FileNotFoundError:
+            pass
+
+        # Stage 1: Planning & TDD Test Design + Acceptance Burn-Down Checklist
         default_bus.publish(EventType.PIPELINE_STEP, {"stage": "planning", "role": "planner"})
         planner_role = Role.from_file(self._get_agent_path("planner"))
         planner_harness = AgentHarness(planner_role, model=active_model)
@@ -60,6 +77,7 @@ class PipelineOrchestrator:
             f"目标任务：{task}\n"
             f"请先阅读项目规则文件（rule/rule.md），检查参考代码（ref/），进行头脑风暴与架构规划。\n"
             f"根据测试驱动开发（TDD）要求，在编写实现代码之前，请先编写测试用例（如写入tests/目录中的测试文件）。\n"
+            f"并且必须将用户所有显式与隐式需求拆解为原子化燃尽验收清单，保存至：`deliverables/acceptance_criteria.md`。\n"
             f"最后将规划方案、功能清单与测试用例说明输出至：{plan_output}"
         )
         plan_res = planner_harness.run(planner_task, output_file=plan_output)
@@ -118,9 +136,40 @@ class PipelineOrchestrator:
 
             verif = self.tdd_gate.run_verification()
             if verif["passed"]:
-                tests_passed = True
-                stage_records.append({"stage": "testing", "loop": loop_count, "status": "passed", "result": test_res})
-                break
+                # Visual aesthetic audit if designer agent exists and task touches UI/3D
+                if any(w in task.lower() for w in ["3d", "ui", "页面", "html", "web", "前端", "界面", "视觉", "审美"]):
+                    try:
+                        designer_path = self._get_agent_path("designer")
+                        default_bus.publish(EventType.PIPELINE_STEP, {"stage": "design_audit", "role": "designer"})
+                        designer_role = Role.from_file(designer_path)
+                        designer_harness = AgentHarness(designer_role, model=active_model)
+                        design_report = "deliverables/design_audit.md"
+                        design_task = (
+                            f"任务目标：{task}\n"
+                            f"请调用 browser_test 截取无头浏览器真实渲染截图，进行视觉审美打分与审查（光影充足、无死黑、排版优雅）。\n"
+                            f"核查 deliverables/acceptance_criteria.md 中的审美指标并进行核验打勾。\n"
+                            f"将审美审查结论写入：{design_report}"
+                        )
+                        designer_harness.run(design_task, output_file=design_report)
+                    except FileNotFoundError:
+                        pass
+
+                # Check Acceptance Burn-Down Checklist Gate
+                from core.acceptance import evaluate_burn_down_gate
+                from core.project import get_current_project
+                proj = get_current_project()
+                cl_path = os.path.join(proj.path, "deliverables", "acceptance_criteria.md")
+                if os.path.exists(cl_path):
+                    cl_ok, cl_reason, cl_status = evaluate_burn_down_gate(cl_path)
+                    stage_records.append({"stage": "burn_down_check", "status": cl_status})
+                    if not cl_ok:
+                        verif["passed"] = False
+                        verif["error_details"] = cl_reason
+
+                if verif["passed"]:
+                    tests_passed = True
+                    stage_records.append({"stage": "testing", "loop": loop_count, "status": "passed", "result": test_res})
+                    break
 
             stage_records.append({"stage": "testing", "loop": loop_count, "status": "failed", "verif": verif})
             default_bus.publish(EventType.TDD_CYCLE, {"loop": loop_count, "status": "tests_failed", "details": verif["error_details"]})

@@ -250,4 +250,18 @@ class AgentHarness:
             if not unstaged.strip() and not staged.strip():
                 return False, "门禁要求代码变更（diff），但未检测到任何代码修改。"
 
+        if rules.get("require_burn_down", False):
+            from core.acceptance import evaluate_burn_down_gate
+            from core.project import get_current_project
+            proj = get_current_project()
+            for cand in [
+                os.path.join(proj.path, "deliverables", "acceptance_criteria.md"),
+                os.path.join(proj.path, "acceptance_criteria.md")
+            ]:
+                if os.path.exists(cand):
+                    burn_ok, burn_reason, _ = evaluate_burn_down_gate(cand)
+                    if not burn_ok:
+                        return False, burn_reason
+                    break
+
         return True, "Output gate passed."
