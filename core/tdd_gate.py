@@ -19,13 +19,23 @@ class TddGate:
 
     def run_verification(self, target: Optional[str] = None) -> Dict[str, Any]:
         """Runs syntax check and test runner on target tests."""
+        from core.project import get_current_project
+        proj = get_current_project()
+        working_dir = proj.path if proj else (self.repo_root or os.getcwd())
         test_target = target or self.target_dir
+
+        # If designated tests folder does not exist in working_dir, validate the working_dir itself
+        if not os.path.isabs(test_target):
+            cand = os.path.join(working_dir, test_target)
+            if not os.path.exists(cand):
+                test_target = working_dir
+
         default_bus.publish(EventType.TDD_CYCLE, {"phase": "verification_start", "target": test_target})
 
         result = tools.execute_tool("test_runner", {
             "target": test_target,
             "mode": "all",
-            "cwd": self.repo_root
+            "cwd": working_dir
         })
 
         passed = result.get("success", False) and result.get("data", {}).get("passed", False)

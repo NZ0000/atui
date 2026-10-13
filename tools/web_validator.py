@@ -15,9 +15,9 @@ from html.parser import HTMLParser
 from typing import Dict, Any, List, Optional, Tuple
 
 try:
-    from tools.base import make_result, cli_runner
+    from tools.base import make_result, cli_runner, resolve_project_path
 except ImportError:
-    from base import make_result, cli_runner
+    from base import make_result, cli_runner, resolve_project_path
 
 TOOL_SPEC = {
     "name": "web_validator",
@@ -311,6 +311,8 @@ def validate_target(path: str, content: Optional[str] = None, file_type: str = "
         elif file_type in ["js", "javascript"]:
             errors.extend(validate_js_code(content))
         return make_result(len(errors) == 0, data={"errors": errors, "error_count": len(errors)})
+
+    path = resolve_project_path(path)
 
     if os.path.isdir(path):
         results = []

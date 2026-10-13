@@ -231,9 +231,10 @@ class AgentHarness:
         if rules.get("require_output_file", True) and output_file:
             from core.project import get_current_project
             proj = get_current_project()
-            candidate_paths = [output_file]
-            if not os.path.isabs(output_file):
+            candidate_paths = []
+            if not os.path.isabs(output_file) and proj and proj.path:
                 candidate_paths.append(os.path.join(proj.path, output_file))
+            candidate_paths.append(output_file)
 
             found = False
             for p in candidate_paths:

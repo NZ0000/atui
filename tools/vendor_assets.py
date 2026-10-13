@@ -12,9 +12,9 @@ import urllib.request
 from typing import Dict, Any, List, Optional
 
 try:
-    from tools.base import make_result, cli_runner
+    from tools.base import make_result, cli_runner, resolve_project_path
 except ImportError:
-    from base import make_result, cli_runner
+    from base import make_result, cli_runner, resolve_project_path
 
 TOOL_SPEC = {
     "name": "vendor_assets",
@@ -69,7 +69,7 @@ def vendor_three(dest_dir: str) -> Dict[str, Any]:
     }
 
 def execute(params: Dict[str, Any]) -> Dict[str, Any]:
-    target_dir = params.get("target_dir", "vendor/three")
+    target_dir = resolve_project_path(params.get("target_dir", "vendor/three"))
     res = vendor_three(target_dir)
     return make_result(res["success"], data=res, error="" if res["success"] else f"Failed to vendor: {res['failed']}")
 

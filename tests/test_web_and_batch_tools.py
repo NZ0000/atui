@@ -53,5 +53,28 @@ class TestWebAndBatchTools(unittest.TestCase):
         res_err = validate_target("", content=invalid_js, file_type="js")
         self.assertFalse(res_err["success"])
 
+    def test_batch_run_detailed_error(self):
+        calls = [
+            {"tool": "calc", "args": {"operation": "invalid_op"}}
+        ]
+        res = execute_batch(calls)
+        self.assertFalse(res["success"])
+        self.assertIn("[calc]:", res["error"])
+
+    def test_resolve_project_path(self):
+        from tools.base import resolve_project_path
+        from core.project import switch_project
+        repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        switch_project(repo_root)
+
+        # Test relative path that exists
+        resolved = resolve_project_path("pytest.ini")
+        self.assertEqual(resolved, os.path.join(repo_root, "pytest.ini"))
+
+        # Test absolute path
+        abs_p = "/tmp/test.txt"
+        self.assertEqual(resolve_project_path(abs_p), abs_p)
+
 if __name__ == "__main__":
     unittest.main()
+

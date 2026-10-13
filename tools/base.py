@@ -10,7 +10,9 @@ Every tool in atui:
 import json
 import argparse
 import sys
-from typing import Any, Dict, Callable
+from typing import Any, Dict, Callable, Optional
+
+import os
 
 def make_result(success: bool, data: Any = None, error: str = "") -> Dict[str, Any]:
     return {
@@ -18,6 +20,27 @@ def make_result(success: bool, data: Any = None, error: str = "") -> Dict[str, A
         "data": data,
         "error": error
     }
+
+def resolve_project_path(path: Optional[str]) -> str:
+    """
+    Resolves relative file/folder paths against the currently active project context.
+    If no project context is set or path is already absolute, returns path as-is.
+    """
+    if not path:
+        return ""
+    if os.path.isabs(path):
+        return path
+    try:
+        from core.project import get_current_project
+        proj = get_current_project()
+        if proj and proj.path:
+            cand = os.path.join(proj.path, path)
+            # If exists in project dir, or neither candidate exists, prefer project dir
+            if os.path.exists(cand) or not os.path.exists(path):
+                return cand
+    except Exception:
+        pass
+    return path
 
 def cli_runner(tool_name: str, tool_spec: Dict[str, Any], execute_fn: Callable[[Dict[str, Any]], Dict[str, Any]]):
     """

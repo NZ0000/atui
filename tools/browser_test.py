@@ -26,9 +26,9 @@ except ImportError:
     websockets = None
 
 try:
-    from tools.base import make_result, cli_runner
+    from tools.base import make_result, cli_runner, resolve_project_path
 except ImportError:
-    from base import make_result, cli_runner
+    from base import make_result, cli_runner, resolve_project_path
 
 TOOL_SPEC = {
     "name": "browser_test",
@@ -223,6 +223,7 @@ def run_browser_test(
     server = None
     target_url = url_or_path
     if not url_or_path.startswith(("http://", "https://")):
+        url_or_path = resolve_project_path(url_or_path)
         local_abs = os.path.abspath(url_or_path)
         if not os.path.exists(local_abs):
             return make_result(False, error=f"Target file does not exist: {url_or_path}")
@@ -233,7 +234,9 @@ def run_browser_test(
         server = _start_local_server(doc_dir, port)
         target_url = f"http://127.0.0.1:{port}/{file_name}"
 
-    if not screenshot_path:
+    if screenshot_path:
+        screenshot_path = resolve_project_path(screenshot_path)
+    else:
         screenshot_path = os.path.join(
             os.path.dirname(os.path.abspath(url_or_path)) if not url_or_path.startswith("http") else os.getcwd(),
             "screenshot.png"

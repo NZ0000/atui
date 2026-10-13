@@ -110,10 +110,14 @@ def execute_batch(calls: List[Dict[str, Any]], stop_on_error: bool = False) -> D
     if all_ok:
         return make_result(True, data=summary_data)
     else:
+        err_details = "; ".join([
+            f"[{r.get('tool', 'unknown')}]: {r.get('result', {}).get('error', 'failed')}"
+            for r in results if not (r.get("result", {}).get("success", False) if isinstance(r.get("result"), dict) else False)
+        ])
         return make_result(
             False,
             data=summary_data,
-            error=f"Batch execution finished with {failure_count} failure(s) out of {len(results)} executed."
+            error=f"Batch execution finished with {failure_count} failure(s) out of {len(results)} executed: {err_details}"
         )
 
 def execute(params: Dict[str, Any]) -> Dict[str, Any]:

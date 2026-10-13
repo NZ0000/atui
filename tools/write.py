@@ -11,9 +11,9 @@ import difflib
 from typing import Dict, Any, Optional
 
 try:
-    from tools.base import make_result, cli_runner
+    from tools.base import make_result, cli_runner, resolve_project_path
 except ImportError:
-    from base import make_result, cli_runner
+    from base import make_result, cli_runner, resolve_project_path
 
 TOOL_SPEC = {
     "name": "write",
@@ -54,6 +54,7 @@ def write_file(
     target_chunk: Optional[str] = None,
     replacement_chunk: Optional[str] = None
 ) -> Dict[str, Any]:
+    path = resolve_project_path(path)
     parent = os.path.dirname(os.path.abspath(path))
     if parent and not os.path.exists(parent):
         try:

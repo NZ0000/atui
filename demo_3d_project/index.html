@@ -3,750 +3,1055 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>赛博朋克科幻浮空空间站 | Cyberpunk Space Station 3D</title>
+    <title>Nexus-7 赛博朋克科幻浮空空间站 | 3D 沉浸式演练系统</title>
     <style>
         * {
-            box-sizing: border-box;
             margin: 0;
             padding: 0;
+            box-sizing: border-box;
         }
         body, html {
             width: 100%;
             height: 100%;
             overflow: hidden;
-            background-color: #030508;
             font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            color: #00ffff;
+            background-color: #030712;
+            color: #f3f4f6;
         }
         #canvas-container {
             width: 100%;
             height: 100%;
-            display: block;
-        }
-        /* HUD UI Styling */
-        #hud-container {
             position: absolute;
-            top: 20px;
-            right: 20px;
-            width: 320px;
-            background: rgba(5, 12, 25, 0.85);
-            border: 1px solid rgba(0, 255, 255, 0.4);
-            border-radius: 4px;
-            padding: 16px;
-            box-shadow: 0 0 20px rgba(0, 255, 255, 0.15), inset 0 0 15px rgba(0, 255, 255, 0.05);
-            backdrop-filter: blur(8px);
-            pointer-events: none;
-            z-index: 10;
-            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            top: 0;
+            left: 0;
+            z-index: 1;
         }
-        #hud-container::before {
-            content: '';
+        /* UI Overlay */
+        .ui-layer {
             position: absolute;
-            top: -1px;
-            left: -1px;
-            width: 10px;
-            height: 10px;
-            border-top: 2px solid #00ffff;
-            border-left: 2px solid #00ffff;
-        }
-        #hud-container::after {
-            content: '';
-            position: absolute;
-            bottom: -1px;
-            right: -1px;
-            width: 10px;
-            height: 10px;
-            border-bottom: 2px solid #00ffff;
-            border-right: 2px solid #00ffff;
-        }
-        .hud-header {
-            font-size: 13px;
-            letter-spacing: 2px;
-            color: #ff00ff;
-            margin-bottom: 8px;
-            text-transform: uppercase;
-            font-weight: bold;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .hud-header span {
-            font-size: 10px;
-            color: #00ffcc;
-            background: rgba(0,255,204,0.1);
-            padding: 2px 6px;
-            border-radius: 2px;
-        }
-        .hud-title {
-            font-size: 18px;
-            font-weight: 700;
-            color: #ffffff;
-            margin-bottom: 10px;
-            text-shadow: 0 0 8px rgba(0, 255, 255, 0.6);
-        }
-        .hud-desc {
-            font-size: 12px;
-            color: #a0c0d0;
-            line-height: 1.5;
-            margin-bottom: 12px;
-            border-bottom: 1px dashed rgba(0, 255, 255, 0.2);
-            padding-bottom: 8px;
-        }
-        .hud-metric {
-            display: flex;
-            justify-content: space-between;
-            font-size: 12px;
-            margin-bottom: 6px;
-        }
-        .hud-metric .label {
-            color: #70a0c0;
-        }
-        .hud-metric .value {
-            color: #00ffff;
-            font-weight: bold;
-            font-family: monospace;
-        }
-        .progress-bar-container {
-            width: 100%;
-            height: 4px;
-            background: rgba(255, 255, 255, 0.1);
-            margin-top: 4px;
-            border-radius: 2px;
-            overflow: hidden;
-        }
-        .progress-bar-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #00ffff, #ff00ff);
-            width: 85%;
-            transition: width 0.3s ease;
-        }
-
-        /* Controls Tip */
-        #controls-tip {
-            position: absolute;
-            bottom: 20px;
-            left: 20px;
-            background: rgba(5, 12, 25, 0.8);
-            border: 1px solid rgba(0, 255, 255, 0.2);
-            padding: 12px 18px;
-            border-radius: 4px;
-            font-size: 12px;
-            color: #80c0e0;
-            backdrop-filter: blur(5px);
-            pointer-events: none;
-            z-index: 10;
-        }
-        #controls-tip b {
-            color: #00ffff;
-        }
-
-        /* Loading Screen */
-        #loader {
-            position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: #020408;
+            z-index: 10;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 24px;
+        }
+        .pointer-events-auto {
+            pointer-events: auto;
+        }
+        /* Header */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            background: linear-gradient(180deg, rgba(3, 7, 18, 0.85) 0%, rgba(3, 7, 18, 0) 100%);
+            padding-bottom: 20px;
+        }
+        .title-box h1 {
+            font-size: 1.75rem;
+            font-weight: 800;
+            letter-spacing: 0.1em;
+            background: linear-gradient(135deg, #38bdf8 0%, #818cf8 50%, #ec4899 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-transform: uppercase;
+            text-shadow: 0 0 30px rgba(56, 189, 248, 0.4);
+        }
+        .title-box p {
+            font-size: 0.85rem;
+            color: #9ca3af;
+            letter-spacing: 0.2em;
+            margin-top: 4px;
+            text-transform: uppercase;
+        }
+        .telemetry-bar {
+            display: flex;
+            gap: 16px;
+            background: rgba(15, 23, 42, 0.75);
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            padding: 10px 18px;
+            border-radius: 8px;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 0 20px rgba(56, 189, 248, 0.15);
+        }
+        .telemetry-item {
+            text-align: center;
+        }
+        .telemetry-item .label {
+            font-size: 0.65rem;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+        .telemetry-item .value {
+            font-size: 1rem;
+            font-weight: 700;
+            color: #38bdf8;
+            font-family: monospace;
+        }
+        /* HUD Panel (Top Right) */
+        .hud-panel {
+            position: absolute;
+            top: 100px;
+            right: 24px;
+            width: 320px;
+            background: rgba(10, 15, 30, 0.85);
+            border: 1px solid rgba(236, 72, 153, 0.4);
+            border-radius: 12px;
+            padding: 20px;
+            backdrop-filter: blur(16px);
+            box-shadow: 0 0 30px rgba(236, 72, 153, 0.2);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transform: translateY(0);
+        }
+        .hud-panel::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, #ec4899, #38bdf8);
+            border-top-left-radius: 12px;
+            border-top-right-radius: 12px;
+        }
+        .hud-title {
+            font-size: 0.75rem;
+            color: #ec4899;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .hud-title span.pulse-dot {
+            width: 8px;
+            height: 8px;
+            background-color: #ec4899;
+            border-radius: 50%;
+            box-shadow: 0 0 8px #ec4899;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(0.95); opacity: 0.8; }
+            50% { transform: scale(1.2); opacity: 1; box-shadow: 0 0 12px #ec4899; }
+            100% { transform: scale(0.95); opacity: 0.8; }
+        }
+        .hud-name {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #f8fafc;
+            margin-bottom: 8px;
+        }
+        .hud-desc {
+            font-size: 0.85rem;
+            color: #94a3b8;
+            line-height: 1.5;
+            margin-bottom: 14px;
+        }
+        .hud-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            padding-top: 12px;
+        }
+        .hud-stat-item .stat-label {
+            font-size: 0.65rem;
+            color: #64748b;
+            text-transform: uppercase;
+        }
+        .hud-stat-item .stat-val {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #38bdf8;
+            font-family: monospace;
+        }
+        /* Footer Controls Guide */
+        footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            background: linear-gradient(0deg, rgba(3, 7, 18, 0.85) 0%, rgba(3, 7, 18, 0) 100%);
+            padding-top: 20px;
+        }
+        .controls-hint {
+            display: flex;
+            gap: 12px;
+            background: rgba(15, 23, 42, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 10px 16px;
+            border-radius: 8px;
+            backdrop-filter: blur(10px);
+        }
+        .hint-badge {
+            font-size: 0.75rem;
+            color: #cbd5e1;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .hint-badge kbd {
+            background: rgba(56, 189, 248, 0.2);
+            border: 1px solid rgba(56, 189, 248, 0.4);
+            color: #38bdf8;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.7rem;
+        }
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        .btn {
+            background: rgba(56, 189, 248, 0.15);
+            border: 1px solid rgba(56, 189, 248, 0.5);
+            color: #38bdf8;
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            backdrop-filter: blur(8px);
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .btn:hover {
+            background: rgba(56, 189, 248, 0.3);
+            box-shadow: 0 0 15px rgba(56, 189, 248, 0.4);
+            transform: translateY(-2px);
+        }
+        .btn-pink {
+            background: rgba(236, 72, 153, 0.15);
+            border-color: rgba(236, 72, 153, 0.5);
+            color: #ec4899;
+        }
+        .btn-pink:hover {
+            background: rgba(236, 72, 153, 0.3);
+            box-shadow: 0 0 15px rgba(236, 72, 153, 0.4);
+        }
+        /* Loading Overlay */
+        #loading {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #030712;
+            z-index: 100;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            z-index: 999;
             transition: opacity 0.8s ease;
         }
         .loader-spinner {
             width: 60px;
             height: 60px;
-            border: 3px solid rgba(0, 255, 255, 0.1);
-            border-top: 3px solid #00ffff;
-            border-right: 3px solid #ff00ff;
+            border: 3px solid rgba(56, 189, 248, 0.2);
+            border-top-color: #38bdf8;
             border-radius: 50%;
             animation: spin 1s linear infinite;
             margin-bottom: 20px;
-        }
-        .loader-text {
-            font-size: 14px;
-            letter-spacing: 4px;
-            color: #00ffff;
-            text-transform: uppercase;
+            box-shadow: 0 0 20px rgba(56, 189, 248, 0.3);
         }
         @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            to { transform: rotate(360deg); }
+        }
+        .loader-text {
+            font-size: 0.9rem;
+            color: #38bdf8;
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
         }
     </style>
-
-    <!-- Import Map for Modern Three.js r160+ (Compatible with both http:// and file:/// via CORS wildcard) -->
+    <!-- Import Map for Three.js -->
     <script type="importmap">
         {
             "imports": {
-                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+                "three": "./vendor/three/three.module.js",
+                "three/addons/": "./vendor/three/addons/"
             }
         }
     </script>
 </head>
 <body>
-    <div id="loader">
+    <div id="loading">
         <div class="loader-spinner"></div>
-        <div class="loader-text">Initializing Orbital Station...</div>
+        <div class="loader-text">Initializing Nexus-7 Telemetry...</div>
     </div>
 
     <div id="canvas-container"></div>
 
-    <div id="hud-container">
-        <div class="hud-header">SYS_TELEMETRY <span>ONLINE</span></div>
-        <div class="hud-title" id="hud-name">NEXUS PRIME ORBITAL</div>
-        <div class="hud-desc" id="hud-desc">Multi-tier modular space station operating in low Earth cyberpunk orbit. Hover over modules for diagnostics.</div>
-        <div class="hud-metric">
-            <span class="label">POWER OUTPUT</span>
-            <span class="value" id="hud-power">98.4%</span>
+    <div class="ui-layer">
+        <header>
+            <div class="title-box">
+                <h1>Nexus-7 Space Station</h1>
+                <p>Cyberpunk Orbital Command & Control System</p>
+            </div>
+            <div class="telemetry-bar">
+                <div class="telemetry-item">
+                    <div class="label">Orbit Alt</div>
+                    <div class="value" id="tele-alt">428.5 km</div>
+                </div>
+                <div class="telemetry-item">
+                    <div class="label">Velocity</div>
+                    <div class="value" id="tele-vel">7.68 km/s</div>
+                </div>
+                <div class="telemetry-item">
+                    <div class="label">Core Temp</div>
+                    <div class="value" id="tele-temp">2,418 K</div>
+                </div>
+                <div class="telemetry-item">
+                    <div class="label">Shields</div>
+                    <div class="value" id="tele-shield">99.8%</div>
+                </div>
+            </div>
+        </header>
+
+        <!-- HUD Panel -->
+        <div class="hud-panel pointer-events-auto" id="hud-panel">
+            <div class="hud-title">
+                <span>Telemetry Target</span>
+                <span class="pulse-dot"></span>
+            </div>
+            <div class="hud-name" id="hud-name">Nexus-7 Central Core</div>
+            <div class="hud-desc" id="hud-desc">主反应堆核心，采用磁约束反物质湮灭技术，向全站提供 12.4 GW 洁净聚变能量。</div>
+            <div class="hud-stats">
+                <div class="hud-stat-item">
+                    <div class="stat-label">Power Output</div>
+                    <div class="stat-val" id="hud-stat-power">12.4 GW</div>
+                </div>
+                <div class="hud-stat-item">
+                    <div class="stat-label">Stability</div>
+                    <div class="stat-val" id="hud-stat-status">STABLE</div>
+                </div>
+            </div>
         </div>
-        <div class="progress-bar-container">
-            <div class="progress-bar-fill" id="hud-progress" style="width: 98.4%;"></div>
-        </div>
-        <div class="hud-metric" style="margin-top: 10px;">
-            <span class="label">CORE TEMP</span>
-            <span class="value" id="hud-temp">1,420 K</span>
-        </div>
-        <div class="hud-metric">
-            <span class="label">GRAVITY SYNC</span>
-            <span class="value">1.02 G</span>
-        </div>
+
+        <footer>
+            <div class="controls-hint">
+                <div class="hint-badge"><kbd>Left Drag</kbd> 旋转视角</div>
+                <div class="hint-badge"><kbd>Right Drag</kbd> 平移场景</div>
+                <div class="hint-badge"><kbd>Scroll</kbd> 缩放距离</div>
+                <div class="hint-badge"><kbd>Hover</kbd> 部件诊断</div>
+            </div>
+            <div class="action-buttons pointer-events-auto">
+                <button class="btn" id="btn-reset-cam">重置摄像机</button>
+                <button class="btn btn-pink" id="btn-toggle-lights">极端光影模式</button>
+            </div>
+        </footer>
     </div>
 
-    <div id="controls-tip">
-        <b>[鼠标左键 + 拖拽]</b> 旋转视角 &nbsp;|&nbsp; <b>[右键 + 拖拽]</b> 平移 &nbsp;|&nbsp; <b>[滚轮]</b> 缩放 &nbsp;|&nbsp; <b>[悬停]</b> 模块诊断
-    </div>
-
+    <!-- Main Application Script -->
     <script type="module">
         import * as THREE from 'three';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-        // --- 1. Scene, Camera, Renderer Setup ---
-        const container = document.getElementById('canvas-container');
-        
-        const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x020408);
-        scene.fog = new THREE.FogExp2(0x060914, 0.008);
+        // --- Application State ---
+        let scene, camera, renderer, controls, clock;
+        let stationGroup, starField, energyStream, debrisBelt;
+        let satellites = [];
+        let raycaster, mouse;
+        let interactiveObjects = [];
+        let hoveredObject = null;
+        let selectedObjectData = null;
 
-        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.5, 1000);
-        camera.position.set(0, 35, 90);
-
-        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-        renderer.shadowMap.enabled = true;
-        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-        renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        renderer.toneMappingExposure = 1.4;
-        container.appendChild(renderer.domElement);
-
-        // --- 2. Controls ---
-        const controls = new OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true;
-        controls.dampingFactor = 0.05;
-        controls.minDistance = 25;
-        controls.maxDistance = 200;
-        controls.maxPolarAngle = Math.PI / 2 + 0.3; // Allow slight look-up
-
-        // --- 3. Enhanced Rich Multi-Source Lighting (Fixes "Dark 3D" Issue) ---
-        // 3.1 Hemisphere Light (Sky ambient + Ground planetary bounce)
-        const hemiLight = new THREE.HemisphereLight(0x88bbff, 0x223355, 2.2);
-        scene.add(hemiLight);
-
-        // 3.2 Ambient Light
-        const ambientLight = new THREE.AmbientLight(0x406088, 1.8);
-        scene.add(ambientLight);
-
-        // 3.3 Main Sun Directional Light (Warm White with Soft Shadow)
-        const mainDirLight = new THREE.DirectionalLight(0xffffff, 3.5);
-        mainDirLight.position.set(70, 90, 60);
-        mainDirLight.castShadow = true;
-        mainDirLight.shadow.mapSize.width = 2048;
-        mainDirLight.shadow.mapSize.height = 2048;
-        mainDirLight.shadow.bias = -0.0001;
-        mainDirLight.shadow.camera.near = 10;
-        mainDirLight.shadow.camera.far = 300;
-        const d = 50;
-        mainDirLight.shadow.camera.left = -d;
-        mainDirLight.shadow.camera.right = d;
-        mainDirLight.shadow.camera.top = d;
-        mainDirLight.shadow.camera.bottom = -d;
-        scene.add(mainDirLight);
-
-        // 3.4 Secondary Rim Light (Cyan rim from back-bottom to sharply outline structures)
-        const rimLight = new THREE.DirectionalLight(0x00d4ff, 2.2);
-        rimLight.position.set(-60, -40, -50);
-        scene.add(rimLight);
-
-        // 3.5 Cyberpunk Neon Point Lights with expanded radius and glow
-        const cyanNeonLight = new THREE.PointLight(0x00ffff, 8, 120);
-        cyanNeonLight.position.set(0, 10, 0);
-        scene.add(cyanNeonLight);
-
-        const magentaNeonLight = new THREE.PointLight(0xff00bb, 8, 120);
-        magentaNeonLight.position.set(0, -10, 0);
-        scene.add(magentaNeonLight);
-
-        // --- 4. Background Starfield & Nebula Particles ---
-        const starCount = 2000;
-        const starGeometry = new THREE.BufferGeometry();
-        const starPositions = new Float32Array(starCount * 3);
-        const starColors = new Float32Array(starCount * 3);
-
-        const colorPalette = [
-            new THREE.Color(0xffffff),
-            new THREE.Color(0x88ccff),
-            new THREE.Color(0xff88cc),
-            new THREE.Color(0x88ffcc)
-        ];
-
-        for (let i = 0; i < starCount * 3; i += 3) {
-            starPositions[i] = (Math.random() - 0.5) * 500;
-            starPositions[i + 1] = (Math.random() - 0.5) * 500;
-            starPositions[i + 2] = (Math.random() - 0.5) * 500;
-
-            const col = colorPalette[Math.floor(Math.random() * colorPalette.length)];
-            starColors[i] = col.r;
-            starColors[i + 1] = col.g;
-            starColors[i + 2] = col.b;
-        }
-
-        starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
-        starGeometry.setAttribute('color', new THREE.BufferAttribute(starColors, 3));
-
-        const starMaterial = new THREE.PointsMaterial({
-            size: 1.2,
-            vertexColors: true,
-            transparent: true,
-            opacity: 0.8
-        });
-
-        const starField = new THREE.Points(starGeometry, starMaterial);
-        scene.add(starField);
-
-        // --- 5. Procedural Space Station Construction ---
-        const interactiveObjects = []; // For Raycasting
-
-        const stationGroup = new THREE.Group();
-        scene.add(stationGroup);
-
-        // Materials (Upgraded: bright metallic reflection, no pitch-black surfaces)
-        const matDarkMetal = new THREE.MeshStandardMaterial({
-            color: 0x485870, // Titanium slate metal (bright visible surface)
-            metalness: 0.65,
-            roughness: 0.35
-        });
-
-        const matLightMetal = new THREE.MeshStandardMaterial({
-            color: 0xb0c4de, // Polished silver-blue steel
-            metalness: 0.8,
-            roughness: 0.2
-        });
-
-        const matGoldTrim = new THREE.MeshStandardMaterial({
-            color: 0xf5c242,
-            metalness: 0.85,
-            roughness: 0.2
-        });
-
-        const matCyanEnergy = new THREE.MeshStandardMaterial({
-            color: 0x00ffff,
-            emissive: 0x00ffff,
-            emissiveIntensity: 3.5,
-            roughness: 0.1
-        });
-
-        const matMagentaGlow = new THREE.MeshStandardMaterial({
-            color: 0xff00bb,
-            emissive: 0xff00bb,
-            emissiveIntensity: 3.5,
-            roughness: 0.1
-        });
-
-        const matSolarPanel = new THREE.MeshStandardMaterial({
-            color: 0x1b4070,
-            metalness: 0.6,
-            roughness: 0.3,
-            emissive: 0x0055aa,
-            emissiveIntensity: 0.5
-        });
-
-        // 5.1 Core Reactor Cylinder (Main Body)
-        const coreGeo = new THREE.CylinderGeometry(4, 4, 30, 32);
-        const coreMesh = new THREE.Mesh(coreGeo, matLightMetal);
-        coreMesh.castShadow = true;
-        coreMesh.receiveShadow = true;
-        coreMesh.userData = {
-            name: "中央反应堆核心 (Central Fusion Core)",
-            desc: "空间站的主动力源与反重力场发生器，持续输出稳定暗物质电能。",
-            power: "99.2%",
-            temp: "1,550 K"
+        // Component telemetry database
+        const componentDatabase = {
+            'core': {
+                name: '主反应堆核心 (Reactor Core)',
+                desc: '核心反物质聚变装置，高亮青色等离子柱维持空间站强磁场与全部电力供应。',
+                power: '12.4 GW',
+                status: 'STABLE (99.9%)'
+            },
+            'command': {
+                name: '指挥塔与雷达盘 (Command Spire)',
+                desc: '远距离量子通信阵列及全息雷达指挥中心，实时监控亚轨道星际航行器。',
+                power: '1.2 GW',
+                status: 'ONLINE'
+            },
+            'ring1': {
+                name: '内层人工重力环 (Inner Grav-Ring)',
+                desc: '以 3.2 RPM 顺时针旋转，产生 0.8g 标准重力环境，供居住舱区与实验室使用。',
+                power: '4.5 GW',
+                status: 'ROTATING (3.2 RPM)'
+            },
+            'ring2': {
+                name: '外层防御与工程环 (Outer Defense Ring)',
+                desc: '以 2.1 RPM 逆时针反向差速旋转，搭载重型离子脉冲炮与纳米维修机器人舱。',
+                power: '6.8 GW',
+                status: 'ARMED / ACTIVE'
+            },
+            'docking': {
+                name: '辐射状对接舱 (Radial Docking Bays)',
+                desc: '具备 6 个标准重力对接通道，当前已接驳 2 艘巡航探测舰及货物运输艇。',
+                power: '0.8 GW',
+                status: 'READY'
+            },
+            'satellite': {
+                name: '巡航护卫卫星 (Scout Satellite)',
+                desc: '自主式深空早期预警探测器，搭载全光谱扫描仪与量子干扰护盾。',
+                power: '450 MW',
+                status: 'PATROL'
+            },
+            'default': {
+                name: 'Nexus-7 空间站矩阵',
+                desc: '赛博朋克深空前哨站，融合了高阶纳米合金与高导光子复合外壳。',
+                power: '25.7 GW',
+                status: 'OPTIMAL'
+            }
         };
-        stationGroup.add(coreMesh);
-        interactiveObjects.push(coreMesh);
 
-        // Core Glowing Energy Strip Bands
-        for (let i = -12; i <= 12; i += 6) {
-            const ringGeo = new THREE.TorusGeometry(4.1, 0.3, 16, 48);
-            const ringMesh = new THREE.Mesh(ringGeo, matCyanEnergy);
-            ringMesh.rotation.x = Math.PI / 2;
-            ringMesh.position.y = i;
-            stationGroup.add(ringMesh);
+        // --- Initialization ---
+        function init() {
+            const container = document.getElementById('canvas-container');
+
+            // 1. Scene setup
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x030712, 0.0015);
+
+            // 2. Camera setup
+            camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 2000);
+            camera.position.set(0, 40, 110);
+
+            // 3. Renderer setup
+            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.2;
+            container.appendChild(renderer.domElement);
+
+            // 4. Controls
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxDistance = 350;
+            controls.minDistance = 20;
+            controls.maxPolarAngle = Math.PI / 2 + 0.1; // allow slight under-view
+
+            // 5. Clock
+            clock = new THREE.Clock();
+
+            // 6. Raycaster & Mouse
+            raycaster = new THREE.Raycaster();
+            mouse = new THREE.Vector2(-999, -999);
+
+            // 7. Lighting
+            setupLighting();
+
+            // 8. Build Environment & Station
+            createStarField();
+            createDebrisBelt();
+            createSpaceStation();
+            createSatellites();
+
+            // 9. Event Listeners
+            window.addEventListener('resize', onWindowResize);
+            window.addEventListener('mousemove', onMouseMove);
+
+            // UI Buttons
+            document.getElementById('btn-reset-cam').addEventListener('click', resetCamera);
+            document.getElementById('btn-toggle-lights').addEventListener('click', toggleLightingMode);
+
+            // Hide loading
+            setTimeout(() => {
+                const loader = document.getElementById('loading');
+                loader.style.opacity = '0';
+                setTimeout(() => loader.remove(), 800);
+            }, 500);
+
+            // Start loop
+            animate();
         }
 
-        // 5.2 Dual Counter-Rotating Gravity Rings (Torus)
-        const ringGroup1 = new THREE.Group();
-        const ringGroup2 = new THREE.Group();
-        stationGroup.add(ringGroup1);
-        stationGroup.add(ringGroup2);
+        // --- Lighting System ---
+        let alternateLighting = false;
+        let ambientLight, hemiLight, dirLight, rimLight;
+        let neonLight1, neonLight2;
 
-        // Ring 1 (Upper, Cyan Accent)
-        const torusGeo1 = new THREE.TorusGeometry(16, 1.8, 24, 64);
-        const torusMesh1 = new THREE.Mesh(torusGeo1, matDarkMetal);
-        torusMesh1.rotation.x = Math.PI / 2;
-        torusMesh1.position.y = 6;
-        torusMesh1.castShadow = true;
-        torusMesh1.receiveShadow = true;
-        torusMesh1.userData = {
-            name: "上层居住与重力环 (Upper Habitat Torus)",
-            desc: "通过持续反向旋转产生 1G 离心重力，供常驻科研与操作人员生活居住。",
-            power: "96.5%",
-            temp: "295 K"
-        };
-        ringGroup1.add(torusMesh1);
-        interactiveObjects.push(torusMesh1);
+        function setupLighting() {
+            // Ambient Light (明亮底色防止死黑)
+            ambientLight = new THREE.AmbientLight(0x1e293b, 1.5);
+            scene.add(ambientLight);
 
-        // Ring 1 Spokes & Hubs
-        for (let i = 0; i < 4; i++) {
-            const angle = (i * Math.PI) / 2;
-            const spokeGeo = new THREE.CylinderGeometry(0.6, 0.6, 12, 16);
-            const spoke = new THREE.Mesh(spokeGeo, matLightMetal);
-            spoke.rotation.z = Math.PI / 2;
-            spoke.position.set(Math.cos(angle) * 8, 6, Math.sin(angle) * 8);
-            ringGroup1.add(spoke);
+            // Hemisphere Light (天空地面漫反射)
+            hemiLight = new THREE.HemisphereLight(0x38bdf8, 0x1e1b4b, 1.2);
+            scene.add(hemiLight);
+
+            // Main Directional Light (主光源 + 阴影)
+            dirLight = new THREE.DirectionalLight(0xffffff, 3.0);
+            dirLight.position.set(80, 120, 60);
+            dirLight.castShadow = true;
+            dirLight.shadow.mapSize.width = 2048;
+            dirLight.shadow.mapSize.height = 2048;
+            dirLight.shadow.bias = -0.0001;
+            const d = 80;
+            dirLight.shadow.camera.left = -d;
+            dirLight.shadow.camera.right = d;
+            dirLight.shadow.camera.top = d;
+            dirLight.shadow.camera.bottom = -d;
+            dirLight.shadow.camera.near = 0.5;
+            dirLight.shadow.camera.far = 400;
+            scene.add(dirLight);
+
+            // Rim Light (逆向边缘轮廓光)
+            rimLight = new THREE.DirectionalLight(0xec4899, 2.0);
+            rimLight.position.set(-80, -40, -60);
+            scene.add(rimLight);
+
+            // Cyberpunk Neon Point Lights
+            neonLight1 = new THREE.PointLight(0x06b6d4, 5, 100);
+            neonLight1.position.set(0, 0, 0);
+            scene.add(neonLight1);
+
+            neonLight2 = new THREE.PointLight(0xec4899, 4, 90);
+            neonLight2.position.set(0, 25, 0);
+            scene.add(neonLight2);
         }
 
-        // Ring 2 (Lower, Magenta Accent)
-        const torusGeo2 = new THREE.TorusGeometry(22, 2.2, 24, 64);
-        const torusMesh2 = new THREE.Mesh(torusGeo2, matDarkMetal);
-        torusMesh2.rotation.x = Math.PI / 2;
-        torusMesh2.position.y = -6;
-        torusMesh2.castShadow = true;
-        torusMesh2.receiveShadow = true;
-        torusMesh2.userData = {
-            name: "下层工业与量子计算环 (Lower Quantum Ring)",
-            desc: "容纳超级量子计算机集群与重工业合成车间，承载海量星际数据运算。",
-            power: "94.8%",
-            temp: "310 K"
-        };
-        ringGroup2.add(torusMesh2);
-        interactiveObjects.push(torusMesh2);
-
-        // Ring 2 Spokes & Energy Glowing Insets
-        for (let i = 0; i < 6; i++) {
-            const angle = (i * Math.PI) / 3;
-            const spokeGeo = new THREE.CylinderGeometry(0.8, 0.8, 16, 16);
-            const spoke = new THREE.Mesh(spokeGeo, matLightMetal);
-            spoke.rotation.z = Math.PI / 2;
-            spoke.position.set(Math.cos(angle) * 11, -6, Math.sin(angle) * 11);
-            ringGroup2.add(spoke);
+        function toggleLightingMode() {
+            alternateLighting = !alternateLighting;
+            if (alternateLighting) {
+                dirLight.intensity = 5.0;
+                ambientLight.color.setHex(0x3b82f6);
+                ambientLight.intensity = 2.5;
+                rimLight.color.setHex(0xa855f7);
+                rimLight.intensity = 4.0;
+                document.getElementById('btn-toggle-lights').style.borderColor = '#38bdf8';
+                document.getElementById('btn-toggle-lights').style.color = '#38bdf8';
+            } else {
+                dirLight.intensity = 3.0;
+                ambientLight.color.setHex(0x1e293b);
+                ambientLight.intensity = 1.5;
+                rimLight.color.setHex(0xec4899);
+                rimLight.intensity = 2.0;
+                document.getElementById('btn-toggle-lights').style.borderColor = '#ec4899';
+                document.getElementById('btn-toggle-lights').style.color = '#ec4899';
+            }
         }
 
-        // 5.3 Radial Docking Bays & Command Tower (Top)
-        const commandTowerGeo = new THREE.CylinderGeometry(2, 3, 8, 16);
-        const commandTower = new THREE.Mesh(commandTowerGeo, matGoldTrim);
-        commandTower.position.y = 18;
-        commandTower.castShadow = true;
-        commandTower.userData = {
-            name: "指挥控制塔台 (Command & Control Hub)",
-            desc: "空间站的神经中枢，负责全域导航、雷达扫描与星际通讯调度。",
-            power: "99.9%",
-            temp: "292 K"
-        };
-        stationGroup.add(commandTower);
-        interactiveObjects.push(commandTower);
+        // --- Star Field Particle System ---
+        function createStarField() {
+            const particleCount = 2500;
+            const geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(particleCount * 3);
+            const colors = new Float32Array(particleCount * 3);
 
-        // Radar Dish on top of Command Tower
-        const radarBase = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.5, 1.5), matDarkMetal);
-        radarBase.position.y = 22.5;
-        stationGroup.add(radarBase);
+            const colorOptions = [
+                new THREE.Color(0x38bdf8), // cyan
+                new THREE.Color(0x818cf8), // indigo
+                new THREE.Color(0xf43f5e), // pink/rose
+                new THREE.Color(0xffffff)  // white
+            ];
 
-        const radarDishGeo = new THREE.SphereGeometry(3, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2);
-        const radarMesh = new THREE.Mesh(radarDishGeo, matLightMetal);
-        radarMesh.rotation.x = -Math.PI / 4;
-        radarMesh.position.y = 23.5;
-        stationGroup.add(radarMesh);
+            for (let i = 0; i < particleCount * 3; i += 3) {
+                // Distribute in a large sphere
+                const radius = 300 + Math.random() * 700;
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.acos((Math.random() * 2) - 1);
 
-        // Radial Docking Arms (4 directions)
-        for (let i = 0; i < 4; i++) {
-            const angle = (i * Math.PI) / 2 + Math.PI / 4;
-            const armGroup = new THREE.Group();
-            armGroup.rotation.y = angle;
+                positions[i] = radius * Math.sin(phi) * Math.cos(theta);
+                positions[i + 1] = radius * Math.sin(phi) * Math.sin(theta);
+                positions[i + 2] = radius * Math.cos(phi);
 
-            const armGeo = new THREE.BoxGeometry(2, 2, 14);
-            const armMesh = new THREE.Mesh(armGeo, matDarkMetal);
-            armMesh.position.z = 10;
-            armMesh.castShadow = true;
-            armMesh.receiveShadow = true;
-            armMesh.userData = {
-                name: `C-${i+1} 舰船对接机库 (Docking Bay C-${i+1})`,
-                desc: "标准星际穿梭机与货运舰船停泊通道，配有电磁牵引力场与气闸密封门。",
-                power: "91.2%",
-                temp: "288 K"
-            };
-            armGroup.add(armMesh);
-            interactiveObjects.push(armMesh);
-
-            // Docking Cylinder Cap
-            const capGeo = new THREE.CylinderGeometry(2.2, 2.2, 3, 16);
-            const capMesh = new THREE.Mesh(capGeo, matMagentaGlow);
-            capMesh.rotation.x = Math.PI / 2;
-            capMesh.position.z = 17;
-            armGroup.add(capMesh);
-
-            stationGroup.add(armGroup);
-        }
-
-        // 5.4 Solar Panels & Power Wings
-        for (let i = 0; i < 2; i++) {
-            const wingGroup = new THREE.Group();
-            wingGroup.rotation.y = i * Math.PI;
-
-            // Boom
-            const boomGeo = new THREE.CylinderGeometry(0.5, 0.5, 28, 12);
-            const boom = new THREE.Mesh(boomGeo, matDarkMetal);
-            boom.rotation.z = Math.PI / 2;
-            boom.position.x = 22;
-            wingGroup.add(boom);
-
-            // Panels Array
-            for (let j = -3; j <= 3; j++) {
-                const panelGeo = new THREE.BoxGeometry(6, 0.2, 10);
-                const panel = new THREE.Mesh(panelGeo, matSolarPanel);
-                panel.position.set(12 + j * 4.5, 0, 0);
-                panel.castShadow = true;
-                panel.receiveShadow = true;
-                panel.userData = {
-                    name: "光子太阳能矩阵 (Photovoltaic Solar Wing)",
-                    desc: "高效吸收恒星辐射并转化为空间站运转电能的高纯度硅晶阵列。",
-                    power: "97.1%",
-                    temp: "340 K"
-                };
-                wingGroup.add(panel);
-                interactiveObjects.push(panel);
+                const col = colorOptions[Math.floor(Math.random() * colorOptions.length)];
+                colors[i] = col.r;
+                colors[i + 1] = col.g;
+                colors[i + 2] = col.b;
             }
 
-            stationGroup.add(wingGroup);
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+            const material = new THREE.PointsMaterial({
+                size: 2.2,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.8,
+                blending: THREE.AdditiveBlending
+            });
+
+            starField = new THREE.Points(geometry, material);
+            scene.add(starField);
         }
 
-        // 5.5 Core Photon Jet Particle Stream (Vertical Exhaust)
-        const jetParticleCount = 400;
-        const jetGeo = new THREE.BufferGeometry();
-        const jetPositions = new Float32Array(jetParticleCount * 3);
-        const jetSpeeds = new Float32Array(jetParticleCount);
+        // --- Debris Belt ---
+        function createDebrisBelt() {
+            const debrisCount = 300;
+            const geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(debrisCount * 3);
 
-        for (let i = 0; i < jetParticleCount * 3; i += 3) {
-            jetPositions[i] = (Math.random() - 0.5) * 3;
-            jetPositions[i + 1] = -15 - Math.random() * 25;
-            jetPositions[i + 2] = (Math.random() - 0.5) * 3;
-            jetSpeeds[i / 3] = 20 + Math.random() * 30;
+            for (let i = 0; i < debrisCount * 3; i += 3) {
+                const radius = 140 + Math.random() * 80;
+                const angle = Math.random() * Math.PI * 2;
+                const y = (Math.random() - 0.5) * 15;
+
+                positions[i] = Math.cos(angle) * radius;
+                positions[i + 1] = y;
+                positions[i + 2] = Math.sin(angle) * radius;
+            }
+
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+            const material = new THREE.PointsMaterial({
+                size: 1.5,
+                color: 0x94a3b8,
+                transparent: true,
+                opacity: 0.5
+            });
+
+            debrisBelt = new THREE.Points(geometry, material);
+            scene.add(debrisBelt);
         }
 
-        jetGeo.setAttribute('position', new THREE.BufferAttribute(jetPositions, 3));
-        const jetMat = new THREE.PointsMaterial({
-            color: 0x00ffff,
-            size: 0.8,
-            transparent: true,
-            opacity: 0.9,
-            blending: THREE.AdditiveBlending
-        });
-        const jetParticles = new THREE.Points(jetGeo, jetMat);
-        stationGroup.add(jetParticles);
+        // --- Space Station Procedural Construction ---
+        function createSpaceStation() {
+            stationGroup = new THREE.Group();
+            scene.add(stationGroup);
 
-        // 5.6 Outer Guard Satellites & Asteroid Debris Field
-        const satelliteGroup = new THREE.Group();
-        scene.add(satelliteGroup);
+            // Shared PBR Materials
+            const matDarkMetal = new THREE.MeshStandardMaterial({
+                color: 0x1e293b,
+                metalness: 0.85,
+                roughness: 0.25
+            });
 
-        const satellites = [];
-        for (let i = 0; i < 5; i++) {
-            const satAngle = (i / 5) * Math.PI * 2;
-            const satDist = 45 + Math.random() * 15;
-            const satHeight = (Math.random() - 0.5) * 20;
+            const matLightAlloy = new THREE.MeshStandardMaterial({
+                color: 0xcbd5e1,
+                metalness: 0.9,
+                roughness: 0.15
+            });
 
-            const satContainer = new THREE.Group();
-            satContainer.position.set(Math.cos(satAngle) * satDist, satHeight, Math.sin(satAngle) * satDist);
+            const matGoldFoil = new THREE.MeshStandardMaterial({
+                color: 0xf59e0b,
+                metalness: 0.95,
+                roughness: 0.3
+            });
 
-            const satBodyGeo = new THREE.BoxGeometry(2, 2, 4);
-            const satBody = new THREE.Mesh(satBodyGeo, matLightMetal);
-            satBody.castShadow = true;
-            satBody.userData = {
-                name: `护卫侦测卫星 S-${i+1} (Scout Satellite S-${i+1})`,
-                desc: "自主巡航防御与空间雷达探测哨兵，装备有微型离子推进器。",
-                power: "99.0%",
-                temp: "250 K"
-            };
-            satContainer.add(satBody);
-            interactiveObjects.push(satBody);
+            const matNeonCyan = new THREE.MeshBasicMaterial({
+                color: 0x06b6d4
+            });
 
-            // Solar wings on satellite
-            const satWing1 = new THREE.Mesh(new THREE.BoxGeometry(6, 0.1, 1.5), matSolarPanel);
-            satWing1.position.x = 3.5;
-            satContainer.add(satWing1);
-            const satWing2 = new THREE.Mesh(new THREE.BoxGeometry(6, 0.1, 1.5), matSolarPanel);
-            satWing2.position.x = -3.5;
-            satContainer.add(satWing2);
+            const matNeonPink = new THREE.MeshBasicMaterial({
+                color: 0xec4899
+            });
 
-            satelliteGroup.add(satContainer);
-            satellites.push({ group: satContainer, angle: satAngle, dist: satDist, speed: 0.2 + Math.random() * 0.3 });
+            // Helper function to mark interactive objects
+            function registerInteractive(mesh, typeKey) {
+                mesh.userData = { typeKey: typeKey };
+                interactiveObjects.push(mesh);
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+            }
+
+            // 1. Central Core Reactor Cylinder
+            const coreGroup = new THREE.Group();
+            const coreGeom = new THREE.CylinderGeometry(4, 4, 36, 32);
+            const coreMesh = new THREE.Mesh(coreGeom, matLightAlloy);
+            registerInteractive(coreMesh, 'core');
+            coreGroup.add(coreMesh);
+
+            // Core Energy Plasma Column (Glowing Center)
+            const plasmaGeom = new THREE.CylinderGeometry(2.5, 2.5, 38, 32);
+            const plasmaMat = new THREE.MeshStandardMaterial({
+                color: 0x06b6d4,
+                emissive: 0x06b6d4,
+                emissiveIntensity: 3.0,
+                transparent: true,
+                opacity: 0.85,
+                roughness: 0.1
+            });
+            const plasmaMesh = new THREE.Mesh(plasmaGeom, plasmaMat);
+            coreGroup.add(plasmaMesh);
+
+            // Energy Beam Particles (Vertical Stream)
+            const streamCount = 400;
+            const streamGeom = new THREE.BufferGeometry();
+            const streamPos = new Float32Array(streamCount * 3);
+            for (let i = 0; i < streamCount * 3; i += 3) {
+                streamPos[i] = (Math.random() - 0.5) * 3.5;
+                streamPos[i + 1] = (Math.random() - 0.5) * 34;
+                streamPos[i + 2] = (Math.random() - 0.5) * 3.5;
+            }
+            streamGeom.setAttribute('position', new THREE.BufferAttribute(streamPos, 3));
+            const streamMat = new THREE.PointsMaterial({
+                size: 0.8,
+                color: 0x38bdf8,
+                transparent: true,
+                opacity: 0.9,
+                blending: THREE.AdditiveBlending
+            });
+            energyStream = new THREE.Points(streamGeom, streamMat);
+            coreGroup.add(energyStream);
+
+            // Core Rings / Girders
+            for (let i = -14; i <= 14; i += 7) {
+                const ribGeom = new THREE.TorusGeometry(4.4, 0.3, 16, 32);
+                const ribMesh = new THREE.Mesh(ribGeom, matDarkMetal);
+                ribMesh.rotation.x = Math.PI / 2;
+                ribMesh.position.y = i;
+                coreGroup.add(ribMesh);
+            }
+
+            stationGroup.add(coreGroup);
+
+            // 2. Top Command Spire & Radar Array
+            const commandGroup = new THREE.Group();
+            commandGroup.position.y = 22;
+
+            const spireBaseGeom = new THREE.CylinderGeometry(2, 3.8, 8, 16);
+            const spireBase = new THREE.Mesh(spireBaseGeom, matDarkMetal);
+            registerInteractive(spireBase, 'command');
+            commandGroup.add(spireBase);
+
+            const domeGeom = new THREE.SphereGeometry(2.5, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2);
+            const domeMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, metalness: 0.8, roughness: 0.1, transparent: true, opacity: 0.9 });
+            const domeMesh = new THREE.Mesh(domeGeom, domeMat);
+            domeMesh.position.y = 4;
+            registerInteractive(domeMesh, 'command');
+            commandGroup.add(domeMesh);
+
+            // Radar Dish
+            const dishGroup = new THREE.Group();
+            dishGroup.position.set(0, 7, 0);
+            const dishGeom = new THREE.SphereGeometry(3, 16, 16, 0, Math.PI * 2, 0, Math.PI / 3);
+            const dishMesh = new THREE.Mesh(dishGeom, matLightAlloy);
+            dishMesh.rotation.x = -Math.PI / 4;
+            dishGroup.add(dishMesh);
+
+            const antennaGeom = new THREE.CylinderGeometry(0.1, 0.1, 4, 8);
+            const antenna = new THREE.Mesh(antennaGeom, matDarkMetal);
+            antenna.position.set(0, 2, 0);
+            dishGroup.add(antenna);
+            commandGroup.add(dishGroup);
+
+            stationGroup.add(commandGroup);
+
+            // 3. Dual Counter-Rotating Torus Rings
+            // Ring 1 (Inner Grav-Ring)
+            const ring1Container = new THREE.Group();
+            const torus1Geom = new THREE.TorusGeometry(18, 2.2, 24, 64);
+            const torus1Mesh = new THREE.Mesh(torus1Geom, matLightAlloy);
+            torus1Mesh.rotation.x = Math.PI / 2;
+            registerInteractive(torus1Mesh, 'ring1');
+            ring1Container.add(torus1Mesh);
+
+            // Spokes for Ring 1
+            for (let i = 0; i < 4; i++) {
+                const angle = (i * Math.PI) / 2;
+                const spokeGeom = new THREE.CylinderGeometry(0.8, 0.8, 14, 16);
+                const spoke = new THREE.Mesh(spokeGeom, matDarkMetal);
+                spoke.rotation.z = Math.PI / 2;
+                spoke.position.set(Math.cos(angle) * 9, 0, Math.sin(angle) * 9);
+                ring1Container.add(spoke);
+
+                // Hab module on outer rim
+                const habGeom = new THREE.BoxGeometry(4, 3, 6);
+                const habMesh = new THREE.Mesh(habGeom, matDarkMetal);
+                habMesh.position.set(Math.cos(angle) * 18, 0, Math.sin(angle) * 18);
+                habMesh.rotation.y = -angle;
+                registerInteractive(habMesh, 'ring1');
+                ring1Container.add(habMesh);
+            }
+            stationGroup.add(ring1Container);
+            stationGroup.userData.ring1Container = ring1Container;
+
+            // Ring 2 (Outer Defense & Engineering Ring)
+            const ring2Container = new THREE.Group();
+            const torus2Geom = new THREE.TorusGeometry(28, 2.5, 24, 64);
+            const torus2Mesh = new THREE.Mesh(torus2Geom, matDarkMetal);
+            torus2Mesh.rotation.x = Math.PI / 2;
+            registerInteractive(torus2Mesh, 'ring2');
+            ring2Container.add(torus2Mesh);
+
+            // Outer ring neon accent strip
+            const neonRingGeom = new THREE.TorusGeometry(28.2, 0.2, 16, 64);
+            const neonRingMesh = new THREE.Mesh(neonRingGeom, matNeonPink);
+            neonRingMesh.rotation.x = Math.PI / 2;
+            ring2Container.add(neonRingMesh);
+
+            // Spokes and defense turrets for Ring 2
+            for (let i = 0; i < 6; i++) {
+                const angle = (i * Math.PI) / 3 + 0.3;
+                const spokeGeom = new THREE.CylinderGeometry(0.9, 0.9, 20, 16);
+                const spoke = new THREE.Mesh(spokeGeom, matLightAlloy);
+                spoke.rotation.z = Math.PI / 2;
+                spoke.position.set(Math.cos(angle) * 13, 0, Math.sin(angle) * 13);
+                ring2Container.add(spoke);
+
+                // Turret Pod
+                const turretGeom = new THREE.CylinderGeometry(1.5, 1.8, 3, 16);
+                const turretMesh = new THREE.Mesh(turretGeom, matGoldFoil);
+                turretMesh.position.set(Math.cos(angle) * 28, 2, Math.sin(angle) * 28);
+                registerInteractive(turretMesh, 'ring2');
+                ring2Container.add(turretMesh);
+            }
+            stationGroup.add(ring2Container);
+            stationGroup.userData.ring2Container = ring2Container;
+
+            // 4. Radial Docking Bays & Hab Modules
+            const dockingGroup = new THREE.Group();
+            for (let i = 0; i < 6; i++) {
+                const angle = (i * Math.PI) / 3;
+                const dockArm = new THREE.Group();
+                dockArm.rotation.y = angle;
+
+                const armGeom = new THREE.BoxGeometry(3, 2, 10);
+                const armMesh = new THREE.Mesh(armGeom, matDarkMetal);
+                armMesh.position.set(0, 0, 12);
+                registerInteractive(armMesh, 'docking');
+                dockArm.add(armMesh);
+
+                // Docking collar / hatch
+                const collarGeom = new THREE.CylinderGeometry(1.8, 1.8, 2, 16);
+                const collarMesh = new THREE.Mesh(collarGeom, matLightAlloy);
+                collarMesh.rotation.x = Math.PI / 2;
+                collarMesh.position.set(0, 0, 17);
+                registerInteractive(collarMesh, 'docking');
+                dockArm.add(collarMesh);
+
+                dockingGroup.add(dockArm);
+            }
+            stationGroup.add(dockingGroup);
+
+            // 5. Bottom Solar Panels & Heat Radiators
+            const bottomGroup = new THREE.Group();
+            bottomGroup.position.y = -20;
+
+            const baseConeGeom = new THREE.ConeGeometry(4, 6, 16);
+            const baseCone = new THREE.Mesh(baseConeGeom, matDarkMetal);
+            baseCone.rotation.x = Math.PI;
+            registerInteractive(baseCone, 'core');
+            bottomGroup.add(baseCone);
+
+            // Solar panel wings (X-shape)
+            for (let i = 0; i < 4; i++) {
+                const angle = (i * Math.PI) / 2;
+                const wingGroup = new THREE.Group();
+                wingGroup.rotation.y = angle;
+
+                const strutGeom = new THREE.CylinderGeometry(0.4, 0.4, 16, 8);
+                const strut = new THREE.Mesh(strutGeom, matDarkMetal);
+                strut.rotation.z = Math.PI / 2;
+                strut.position.set(10, 0, 0);
+                wingGroup.add(strut);
+
+                // Panel grid
+                const panelGeom = new THREE.BoxGeometry(14, 0.2, 8);
+                const panelMat = new THREE.MeshStandardMaterial({
+                    color: 0x0f172a,
+                    emissive: 0x1d4ed8,
+                    emissiveIntensity: 0.4,
+                    metalness: 0.9,
+                    roughness: 0.2
+                });
+                const panel = new THREE.Mesh(panelGeom, panelMat);
+                panel.position.set(12, 0, 0);
+                registerInteractive(panel, 'core');
+                wingGroup.add(panel);
+
+                bottomGroup.add(wingGroup);
+            }
+            stationGroup.add(bottomGroup);
         }
 
-        // Asteroid Debris Ring
-        const asteroidGroup = new THREE.Group();
-        scene.add(asteroidGroup);
-        const asteroidGeo = new THREE.DodecahedronGeometry(1, 1);
+        // --- Satellites Orbiting ---
+        function createSatellites() {
+            const satCount = 4;
+            for (let i = 0; i < satCount; i++) {
+                const satGroup = new THREE.Group();
 
-        for (let i = 0; i < 40; i++) {
-            const astAngle = Math.random() * Math.PI * 2;
-            const astDist = 70 + Math.random() * 40;
-            const astHeight = (Math.random() - 0.5) * 30;
+                const bodyGeom = new THREE.BoxGeometry(2, 1.5, 3);
+                const satMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.9, roughness: 0.2 });
+                const body = new THREE.Mesh(bodyGeom, satMat);
+                body.userData = { typeKey: 'satellite' };
+                interactiveObjects.push(body);
+                satGroup.add(body);
 
-            const scale = 0.8 + Math.random() * 2.5;
-            const asteroid = new THREE.Mesh(asteroidGeo, matDarkMetal);
-            asteroid.position.set(Math.cos(astAngle) * astDist, astHeight, Math.sin(astAngle) * astDist);
-            asteroid.scale.set(scale, scale * (0.6 + Math.random() * 0.8), scale);
-            asteroid.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, 0);
-            asteroid.castShadow = true;
-            asteroid.receiveShadow = true;
-            asteroidGroup.add(asteroid);
+                // Small solar wings
+                const wing1Geom = new THREE.BoxGeometry(6, 0.1, 2);
+                const wingMat = new THREE.MeshStandardMaterial({ color: 0x1e3a8a, metalness: 0.8, roughness: 0.3, emissive: 0x3b82f6, emissiveIntensity: 0.3 });
+                const wing1 = new THREE.Mesh(wing1Geom, wingMat);
+                wing1.position.x = 4;
+                wing1.userData = { typeKey: 'satellite' };
+                interactiveObjects.push(wing1);
+                satGroup.add(wing1);
+
+                const wing2 = new THREE.Mesh(wing1Geom, wingMat);
+                wing2.position.x = -4;
+                wing2.userData = { typeKey: 'satellite' };
+                interactiveObjects.push(wing2);
+                satGroup.add(wing2);
+
+                // Orbit parameters
+                const radius = 55 + i * 15;
+                const speed = 0.3 + i * 0.1;
+                const angle = (i * Math.PI * 2) / satCount;
+
+                satellites.push({
+                    group: satGroup,
+                    radius: radius,
+                    speed: speed,
+                    angle: angle,
+                    yOffset: (i % 2 === 0 ? 10 : -10)
+                });
+
+                scene.add(satGroup);
+            }
         }
 
-        // --- 6. Raycasting & Interactive Hover ---
-        const raycaster = new THREE.Raycaster();
-        const mouse = new THREE.Vector2(-999, -999);
-        let hoveredObject = null;
-        let originalMaterial = null;
-
-        const highlightMaterial = new THREE.MeshStandardMaterial({
-            color: 0x00ffff,
-            emissive: 0x00ffff,
-            emissiveIntensity: 0.6,
-            metalness: 0.9,
-            roughness: 0.2
-        });
-
-        window.addEventListener('mousemove', (event) => {
+        // --- Interaction & Raycasting ---
+        function onMouseMove(event) {
             mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
             mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-        });
+        }
 
-        // Hide Loader once ready
-        setTimeout(() => {
-            const loader = document.getElementById('loader');
-            loader.style.opacity = '0';
-            setTimeout(() => loader.remove(), 800);
-        }, 600);
+        function updateRaycasting() {
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(interactiveObjects, true);
 
-        // --- 7. Animation Loop with Delta Clock ---
-        const clock = new THREE.Clock();
+            if (intersects.length > 0) {
+                // Find top-level interactive mesh
+                let target = intersects[0].object;
+                while (target && (!target.userData || !target.userData.typeKey) && target.parent && target !== scene) {
+                    target = target.parent;
+                }
 
+                if (target && target.userData && target.userData.typeKey) {
+                    if (hoveredObject !== target) {
+                        hoveredObject = target;
+                        updateHUD(target.userData.typeKey);
+                    }
+                    document.body.style.cursor = 'pointer';
+                    return;
+                }
+            }
+
+            // Default if nothing hovered
+            if (hoveredObject !== null) {
+                hoveredObject = null;
+                updateHUD('default');
+                document.body.style.cursor = 'default';
+            }
+        }
+
+        function updateHUD(typeKey) {
+            const data = componentDatabase[typeKey] || componentDatabase['default'];
+            document.getElementById('hud-name').textContent = data.name;
+            document.getElementById('hud-desc').textContent = data.desc;
+            document.getElementById('hud-stat-power').textContent = data.power;
+            document.getElementById('hud-stat-status').textContent = data.status;
+
+            // Highlight HUD border temporarily
+            const panel = document.getElementById('hud-panel');
+            panel.style.boxShadow = '0 0 35px rgba(56, 189, 248, 0.4)';
+            setTimeout(() => {
+                panel.style.boxShadow = '0 0 30px rgba(236, 72, 153, 0.2)';
+            }, 300);
+        }
+
+        // --- Window Resize ---
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // --- Reset Camera ---
+        function resetCamera() {
+            const targetPos = new THREE.Vector3(0, 40, 110);
+            const startPos = camera.position.clone();
+            const startTime = performance.now();
+            const duration = 1000;
+
+            function animateCam(now) {
+                const elapsed = now - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                // Ease out cubic
+                const ease = 1 - Math.pow(1 - progress, 3);
+
+                camera.position.lerpVectors(startPos, targetPos, ease);
+                controls.target.set(0, 0, 0);
+                controls.update();
+
+                if (progress < 1) {
+                    requestAnimationFrame(animateCam);
+                }
+            }
+            requestAnimationFrame(animateCam);
+        }
+
+        // --- Animation Loop ---
         function animate() {
             requestAnimationFrame(animate);
 
             const delta = clock.getDelta();
             const elapsedTime = clock.getElapsedTime();
 
-            // 1. Station subtle floating
-            stationGroup.position.y = Math.sin(elapsedTime * 1.2) * 1.2;
-            stationGroup.rotation.y = elapsedTime * 0.05;
+            // 1. Station subtle floating (Sine bobbing)
+            if (stationGroup) {
+                stationGroup.position.y = Math.sin(elapsedTime * 1.2) * 1.5;
+                stationGroup.rotation.y = elapsedTime * 0.05;
+            }
 
             // 2. Counter-rotating rings
-            ringGroup1.rotation.y += delta * 0.25;
-            ringGroup2.rotation.y -= delta * 0.35;
+            if (stationGroup && stationGroup.userData.ring1Container) {
+                stationGroup.userData.ring1Container.rotation.y = elapsedTime * 0.25;
+            }
+            if (stationGroup && stationGroup.userData.ring2Container) {
+                stationGroup.userData.ring2Container.rotation.y = -elapsedTime * 0.18;
+            }
 
-            // 3. Orbiting satellites
+            // 3. Satellites orbit
             satellites.forEach(sat => {
-                sat.angle += sat.speed * delta * 0.2;
-                sat.group.position.x = Math.cos(sat.angle) * sat.dist;
-                sat.group.position.z = Math.sin(sat.angle) * sat.dist;
+                sat.angle += sat.speed * delta * 0.5;
+                const x = Math.cos(sat.angle) * sat.radius;
+                const z = Math.sin(sat.angle) * sat.radius;
+                sat.group.position.set(x, sat.yOffset + Math.sin(elapsedTime + sat.speed) * 2, z);
                 sat.group.rotation.y = -sat.angle;
             });
 
-            // 4. Background starfield slow rotation
-            starField.rotation.y = elapsedTime * 0.01;
-            asteroidGroup.rotation.y = elapsedTime * 0.02;
-
-            // 5. Photon Jet particle stream animation
-            const jetPosArr = jetGeo.attributes.position.array;
-            for (let i = 0; i < jetParticleCount; i++) {
-                jetPosArr[i * 3 + 1] -= delta * 25;
-                if (jetPosArr[i * 3 + 1] < -45) {
-                    jetPosArr[i * 3 + 1] = -15;
-                }
+            // 4. Starfield & debris slow drift
+            if (starField) {
+                starField.rotation.y = elapsedTime * 0.008;
             }
-            jetGeo.attributes.position.needsUpdate = true;
-
-            // 6. Raycaster Intersection Check
-            raycaster.setFromCamera(mouse, camera);
-            const intersects = raycaster.intersectObjects(interactiveObjects, true);
-
-            if (intersects.length > 0) {
-                let hitObj = intersects[0].object;
-                // Find top parent in interactive list if needed
-                while (hitObj && !interactiveObjects.includes(hitObj) && hitObj.parent) {
-                    hitObj = hitObj.parent;
-                }
-
-                if (hitObj && hitObj.userData && hitObj.userData.name) {
-                    if (hoveredObject !== hitObj) {
-                        if (hoveredObject && originalMaterial) {
-                            hoveredObject.material = originalMaterial;
-                        }
-                        hoveredObject = hitObj;
-                        originalMaterial = hitObj.material;
-                        hitObj.material = highlightMaterial;
-
-                        // Update HUD UI
-                        document.getElementById('hud-name').innerText = hitObj.userData.name;
-                        document.getElementById('hud-desc').innerText = hitObj.userData.desc;
-                        document.getElementById('hud-power').innerText = hitObj.userData.power;
-                        document.getElementById('hud-progress').style.width = hitObj.userData.power;
-                        document.getElementById('hud-temp').innerText = hitObj.userData.temp;
-                        document.getElementById('hud-container').style.borderColor = '#ff00ff';
-                    }
-                }
-            } else {
-                if (hoveredObject) {
-                    if (originalMaterial) {
-                        hoveredObject.material = originalMaterial;
-                    }
-                    hoveredObject = null;
-                    originalMaterial = null;
-
-                    // Reset HUD UI to Default
-                    document.getElementById('hud-name').innerText = "NEXUS PRIME ORBITAL";
-                    document.getElementById('hud-desc').innerText = "Multi-tier modular space station operating in low Earth cyberpunk orbit. Hover over modules for diagnostics.";
-                    document.getElementById('hud-power').innerText = "98.4%";
-                    document.getElementById('hud-progress').style.width = "98.4%";
-                    document.getElementById('hud-temp').innerText = "1,420 K";
-                    document.getElementById('hud-container').style.borderColor = "rgba(0, 255, 255, 0.4)";
-                }
+            if (debrisBelt) {
+                debrisBelt.rotation.y = elapsedTime * 0.012;
             }
 
+            // 5. Energy stream animation
+            if (energyStream) {
+                const positions = energyStream.geometry.attributes.position.array;
+                for (let i = 1; i < positions.length; i += 3) {
+                    positions[i] -= delta * 30; // move down
+                    if (positions[i] < -18) {
+                        positions[i] = 18;
+                    }
+                }
+                energyStream.geometry.attributes.position.needsUpdate = true;
+            }
+
+            // 6. Raycast check
+            updateRaycasting();
+
+            // 7. Update controls & render
             controls.update();
             renderer.render(scene, camera);
         }
 
-        animate();
-
-        // --- 8. Window Resize Response ---
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
+        // Run Init
+        init();
     </script>
 </body>
 </html>

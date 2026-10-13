@@ -16,6 +16,9 @@ class TestProjectContext(unittest.TestCase):
         self.repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         switch_project(self.repo_root)
 
+    def tearDown(self):
+        switch_project(self.repo_root)
+
     def test_current_project_detects_rules(self):
         ctx = get_current_project()
         self.assertTrue(os.path.exists(ctx.path))

@@ -10,9 +10,9 @@ import sys
 from typing import Dict, Any, Optional
 
 try:
-    from tools.base import make_result, cli_runner
+    from tools.base import make_result, cli_runner, resolve_project_path
 except ImportError:
-    from base import make_result, cli_runner
+    from base import make_result, cli_runner, resolve_project_path
 
 TOOL_SPEC = {
     "name": "read",
@@ -38,6 +38,7 @@ TOOL_SPEC = {
 }
 
 def read_path(path: str, start_line: Optional[int] = None, end_line: Optional[int] = None) -> Dict[str, Any]:
+    path = resolve_project_path(path)
     if not os.path.exists(path):
         return make_result(False, error=f"Path not found: {path}")
 
