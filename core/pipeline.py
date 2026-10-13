@@ -1,0 +1,199 @@
+"""
+Main Orchestrator Pipeline for atui.
+Coordinates the end-to-end multi-agent lifecycle:
+Planning (TDD tests) -> Coding -> Testing & Repair Loop -> Git Review/Rollback -> Delivery.
+"""
+
+import os
+import json
+import time
+from typing import Dict, Any, Optional
+from core.harness import AgentHarness
+from core.role import Role
+from core.tdd_gate import TddGate
+from core.event_bus import default_bus, EventType
+import tools
+
+class PipelineOrchestrator:
+    def __init__(
+        self,
+        agents_dir: str = "agents",
+        model: Optional[str] = None,
+        max_repair_loops: int = 5
+    ):
+        self.agents_dir = os.path.abspath(agents_dir)
+        self.model = model
+        self.max_repair_loops = max_repair_loops
+        self.tdd_gate = TddGate()
+
+    def _get_agent_path(self, role_name: str) -> str:
+        md_path = os.path.join(self.agents_dir, f"{role_name}.md")
+        json_path = os.path.join(self.agents_dir, f"{role_name}.json")
+        if os.path.exists(md_path):
+            return md_path
+        if os.path.exists(json_path):
+            return json_path
+        raise FileNotFoundError(f"Agent config for '{role_name}' not found in {self.agents_dir}")
+
+    def run_pipeline(
+        self,
+        task: str,
+        output_file: str = "deliverables/summary.md",
+        model: Optional[str] = None
+    ) -> Dict[str, Any]:
+        active_model = model or self.model
+        start_time = time.time()
+        stage_records = []
+
+        default_bus.publish(
+            EventType.PIPELINE_STEP,
+            {"stage": "pipeline_start", "task": task, "output_file": output_file, "model": active_model}
+        )
+
+        # Stage 1: Planning & TDD Test Design
+        default_bus.publish(EventType.PIPELINE_STEP, {"stage": "planning", "role": "planner"})
+        planner_role = Role.from_file(self._get_agent_path("planner"))
+        planner_harness = AgentHarness(planner_role, model=active_model)
+        
+        plan_output = "deliverables/plan.md"
+        planner_task = (
+            f"目标任务：{task}\n"
+            f"请先阅读项目规则文件（rule/rule.md），检查参考代码（ref/），进行头脑风暴与架构规划。\n"
+            f"根据测试驱动开发（TDD）要求，在编写实现代码之前，请先编写测试用例（如写入tests/目录中的测试文件）。\n"
+            f"最后将规划方案、功能清单与测试用例说明输出至：{plan_output}"
+        )
+        plan_res = planner_harness.run(planner_task, output_file=plan_output)
+        stage_records.append({"stage": "planning", "result": plan_res})
+
+        if not plan_res.get("success"):
+            return {
+                "success": False,
+                "stage_failed": "planning",
+                "error": plan_res.get("error", "Planner failed to satisfy output gate."),
+                "stage_records": stage_records
+            }
+
+        # Stage 2: Coding
+        default_bus.publish(EventType.PIPELINE_STEP, {"stage": "coding", "role": "coder"})
+        coder_role = Role.from_file(self._get_agent_path("coder"))
+        coder_harness = AgentHarness(coder_role, model=active_model)
+
+        coder_output = "deliverables/code_changes.md"
+        coder_task = (
+            f"目标任务：{task}\n"
+            f"规划方案已保存在 `{plan_output}`。请查阅规划方案及现有测试用例。\n"
+            f"严格遵循项目规则（rule/rule.md），编写或修改代码以使所有测试用例通过。\n"
+            f"将完成的代码变更清单与修改说明输出至：{coder_output}"
+        )
+        code_res = coder_harness.run(coder_task, output_file=coder_output)
+        stage_records.append({"stage": "coding", "result": code_res})
+
+        if not code_res.get("success"):
+            return {
+                "success": False,
+                "stage_failed": "coding",
+                "error": code_res.get("error", "Coder failed to satisfy output gate."),
+                "stage_records": stage_records
+            }
+
+        # Stage 3: Testing Loop
+        default_bus.publish(EventType.PIPELINE_STEP, {"stage": "testing_loop", "role": "tester"})
+        tester_role = Role.from_file(self._get_agent_path("tester"))
+        tester_harness = AgentHarness(tester_role, model=active_model)
+
+        loop_count = 0
+        tests_passed = False
+        test_report_file = "deliverables/test_report.md"
+
+        while loop_count < self.max_repair_loops:
+            loop_count += 1
+            default_bus.publish(EventType.TDD_CYCLE, {"loop": loop_count, "status": "running_tests"})
+
+            tester_task = (
+                f"当前第 {loop_count} 轮测试。\n"
+                f"使用 test_runner 工具执行语法检查（syntax）与全量测试用例（pytest/unittest）。\n"
+                f"详细记录测试结果，输出至：{test_report_file}"
+            )
+            test_res = tester_harness.run(tester_task, output_file=test_report_file)
+
+            verif = self.tdd_gate.run_verification()
+            if verif["passed"]:
+                tests_passed = True
+                stage_records.append({"stage": "testing", "loop": loop_count, "status": "passed", "result": test_res})
+                break
+
+            stage_records.append({"stage": "testing", "loop": loop_count, "status": "failed", "verif": verif})
+            default_bus.publish(EventType.TDD_CYCLE, {"loop": loop_count, "status": "tests_failed", "details": verif["error_details"]})
+
+            repair_task = (
+                f"【测试未通过，进入代码自修复第 {loop_count} 轮】\n"
+                f"错误详情如下：\n{verif['error_details']}\n\n"
+                f"请阅读报错信息、对应源代码及测试文件，修正代码中的缺陷，确保测试能够通过。\n"
+                f"将修复说明写入：{coder_output}"
+            )
+            repair_res = coder_harness.run(repair_task, output_file=coder_output)
+            if not repair_res.get("success"):
+                break
+
+        if not tests_passed:
+            self.tdd_gate.verify_and_git_gate("Failed build rollback")
+            return {
+                "success": False,
+                "stage_failed": "testing_loop",
+                "error": f"Tests failed after {loop_count} repair cycles. Changes rolled back.",
+                "stage_records": stage_records
+            }
+
+        # Stage 4: Git Review
+        default_bus.publish(EventType.PIPELINE_STEP, {"stage": "git_review", "role": "git_agent"})
+        git_role = Role.from_file(self._get_agent_path("git_agent"))
+        git_harness = AgentHarness(git_role, model=active_model)
+
+        git_report_file = "deliverables/git_report.md"
+        git_gate_res = self.tdd_gate.verify_and_git_gate(f"feat: {task[:50]}")
+
+        git_task = (
+            f"目标任务：{task}\n"
+            f"代码已通过测试验证。Git 门禁执行结果：{json.dumps(git_gate_res, ensure_ascii=False)}\n"
+            f"请使用 git_tool 检查当前 git status, git diff, git log，核实提交与仓库状态。\n"
+            f"若发生合并问题需回退，使用 git_tool 执行回退。\n"
+            f"将完整的 Git 审查与提交/回退状态写入：{git_report_file}"
+        )
+        git_agent_res = git_harness.run(git_task, output_file=git_report_file)
+        stage_records.append({"stage": "git_review", "gate": git_gate_res, "result": git_agent_res})
+
+        if not git_gate_res.get("success"):
+            return {
+                "success": False,
+                "stage_failed": "git_gate",
+                "error": git_gate_res.get("error", "Git gate verification failed."),
+                "stage_records": stage_records
+            }
+
+        # Stage 5: Delivery
+        default_bus.publish(EventType.PIPELINE_STEP, {"stage": "delivery", "role": "delivery"})
+        delivery_role = Role.from_file(self._get_agent_path("delivery"))
+        delivery_harness = AgentHarness(delivery_role, model=active_model)
+
+        delivery_task = (
+            f"目标任务：{task}\n"
+            f"所有规划、编码、测试与 Git 审查已全部圆满完成。\n"
+            f"请汇总整理本次执行经验、技术坑点与避坑指南、注意事项、各角色分工说明、使用方法与产出资产清单。\n"
+            f"必须严格遵循交付规范，将最终总结沉淀并写入最终文件：{output_file}"
+        )
+        deliv_res = delivery_harness.run(delivery_task, output_file=output_file)
+        stage_records.append({"stage": "delivery", "result": deliv_res})
+
+        elapsed = round(time.time() - start_time, 2)
+        default_bus.publish(
+            EventType.PIPELINE_STEP,
+            {"stage": "pipeline_finish", "success": True, "elapsed_seconds": elapsed, "output_file": output_file}
+        )
+
+        return {
+            "success": True,
+            "task": task,
+            "output_file": output_file,
+            "elapsed_seconds": elapsed,
+            "stage_records": stage_records
+        }
