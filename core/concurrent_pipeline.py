@@ -42,7 +42,7 @@ class ConcurrentModularPipeline:
         agents_dir: str = "agents",
         model: Optional[str] = None,
         max_workers: int = 4,
-        max_repair_loops: int = 4
+        max_repair_loops: int = 6
     ):
         self.agents_dir = os.path.abspath(agents_dir)
         self.model = model
@@ -1028,13 +1028,12 @@ class ConcurrentModularPipeline:
                 f"【迭代修复后视觉验收】\n"
                 f"本次迭代目标：{task}\n"
                 f"{url_hint}\n"
-                f"请调用 browser_interact 工具，wait_for_load_ms=12000，执行以下多视角截图序列：\n"
-                f"  步骤1：wait_for_console（等待 'loaded' 日志，timeout_ms=15000）\n"
+                f"请调用 browser_interact 工具，wait_for_load_ms=12000，执行以下验收序列（不要点击任何特定按钮，仅观察默认状态）：\n"
+                f"  步骤1：wait_for_console（等待加载完成日志，timeout_ms=15000）\n"
                 f"  步骤2：screenshot 默认视角 → deliverables/iter_final_default.png\n"
-                f"  步骤3：点击黄昏按钮（#btn-sunset 或文本'夕阳'）→ wait 1000ms → screenshot → iter_final_sunset.png\n"
-                f"  步骤4：点击夜晚按钮（#btn-night 或文本'夜晚'）→ wait 1000ms → screenshot → iter_final_night.png\n"
-                f"  步骤5：点击木屋特写（#cam-chalet）→ wait 1500ms → screenshot → iter_final_chalet.png\n"
+                f"  步骤3：滚动或平移相机到另一角度（若工具支持）→ screenshot → deliverables/iter_final_alt.png\n"
                 f"对照迭代分析报告（{analyst_out}）中的原始问题清单，逐项核验每个问题是否已被修复。\n"
+                f"特别注意：页面控制台若存在任何报错，直接 REJECT 并附上报错内容。\n"
                 f"输出多视角审美验收报告至：{design_out}，首行标明【验收结果：PASS】或【验收结果：REJECT 驳回】。"
             )
             designer_harness.run(design_task, output_file=design_out)
@@ -1074,15 +1073,39 @@ class ConcurrentModularPipeline:
             sf.write(summary)
 
         git_res = None
-        if conditions_passed and len(failed_files) == 0:
+        # Machine runtime verdict: page loads with zero console errors?
+        run_ok = None
+        if project_url:
+            try:
+                import tools as _tools
+                _tools.discover_tools()
+                bt = _tools.execute_tool("browser_test", {"url_or_path": project_url, "wait_ms": 8000})
+                bt_data = (bt.get("data") or {}) if isinstance(bt, dict) else {}
+                if bt_data:
+                    run_ok = (not bt_data.get("console_errors")) and (not bt_data.get("network_failures"))
+            except Exception:
+                run_ok = None
+        any_success = len(failed_files) < len(fix_results)
+        strict_pass = conditions_passed and len(failed_files) == 0
+        # Partial-success policy: if the program RUNS CLEAN (no console errors)
+        # and at least one worker succeeded, keep the progress instead of wiping it.
+        partial_pass = (run_ok is True) and any_success
+        if strict_pass or partial_pass:
+            if not strict_pass and partial_pass:
+                warn = f"partial commit: conditions not fully met ({gate_verdict.get('failure_summary', '')}); runtime clean, progress kept"
+                default_bus.publish(EventType.PIPELINE_STEP, {"stage": "partial_commit_warning", "summary": warn})
+                summary += f"\n> ⚠️ 部分成功提交：程序运行零报错，保留已完成的进度；未达标项：{gate_verdict.get('failure_summary', '')}\n"
+                self._record_lesson(task, f"partial: {gate_verdict.get('failure_summary', '')}", proj.path)
             git_res = self.tdd_gate.verify_and_git_gate(f"fix(iteration): {task[:60]}")
         else:
-            # Hard reject: acceptance conditions failed (or fix workers failed).
+            # Hard reject: page broken / console errors / all workers failed.
             # NEVER commit — rollback scoped to the project directory only.
             reason = (
-                f"conditions gate failed: {gate_verdict.get('failure_summary', '')}"
-                if not conditions_passed else
-                f"fix workers failed: {failed_files}"
+                f"runtime check failed (console errors or network failures): url={project_url}"
+                if run_ok is False else
+                (f"conditions gate failed: {gate_verdict.get('failure_summary', '')}"
+                 if not conditions_passed else
+                 f"all fix workers failed: {failed_files}")
             )
             self._record_lesson(task, reason, proj.path)
             default_bus.publish(EventType.GIT_ACTION, {
@@ -1386,6 +1409,8 @@ class ConcurrentModularPipeline:
                 if loop >= 2:
                     coder_task += (
                         f"\n\n【升级策略（第 {loop} 轮，上轮方案已被驳回，禁止原样重试）】\n"
+                        f"- 自检必须调用 condition_gate 工具（传 conditions 与 root_dir 参数），"
+                        f"严禁使用 python -m tools.condition_gate 命令行（参数易错、此前多次因此空转）。\n"
                         f"- 先调用 condition_gate 工具（conditions_file=deliverables/check_conditions.json）自评当前代码，"
                         f"对照每条失败项逐条映射到具体代码动作，列清单后再动手。\n"
                         f"- 调用 web_search 检索相关技术资料与解决方案（如实现思路、现成资产下载源）。\n"

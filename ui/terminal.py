@@ -93,9 +93,16 @@ def format_event_for_human(event: Event):
     elif t == EventType.GIT_ACTION.value:
         act = event.data.get("action")
         print(f"  {MAGENTA}🌿 Git 审查动作:{RESET} {act}")
+        if act in ("rollback_trigger", "rolled_back") and event.data.get("reason"):
+            print(f"    {YELLOW}↳ 原因: {str(event.data.get('reason'))[:400]}{RESET}")
     elif t == EventType.PIPELINE_STEP.value:
         stage = event.data.get("stage")
         print(f"\n{BLUE}▶ 流水线步骤:{RESET} {BOLD}{stage}{RESET}")
+        # Observability: surface rich payloads (gate failures, consult notes)
+        for key in ("failures", "reason", "error", "summary", "detail"):
+            val = event.data.get(key)
+            if val and key != "stage":
+                print(f"  {YELLOW}↳ {key}:{RESET} {str(val)[:500]}")
 
 def render_markdown(text: str):
     """Clean terminal markdown rendering."""
