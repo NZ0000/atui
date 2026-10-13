@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cyber Robot 3D Showcase | 高级赛博机甲展厅</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #05050a;
+            color: #e0e6ed;
+        }
+        #webgl-container {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+        /* UI Overlay */
+        .ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 24px;
+        }
+        header, .control-panel, .status-bar {
+            pointer-events: auto;
+        }
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(10, 10, 20, 0.75);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(0, 243, 255, 0.2);
+            border-radius: 12px;
+            padding: 16px 28px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), inset 0 0 15px rgba(0, 243, 255, 0.05);
+        }
+        header h1 {
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            background: linear-gradient(135deg, #00f3ff, #7000ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 20px rgba(0, 243, 255, 0.4);
+        }
+        .fps-counter {
+            font-family: monospace;
+            font-size: 14px;
+            color: #00f3ff;
+            background: rgba(0, 243, 255, 0.1);
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: 1px solid rgba(0, 243, 255, 0.3);
+        }
+        .control-panel {
+            align-self: flex-start;
+            background: rgba(10, 10, 20, 0.8);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(112, 0, 255, 0.3);
+            border-radius: 12px;
+            padding: 20px;
+            width: 280px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .control-group label {
+            font-size: 12px;
+            letter-spacing: 1px;
+            color: #a0aec0;
+            text-transform: uppercase;
+        }
+        .btn-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+        }
+        button.cyber-btn {
+            background: linear-gradient(135deg, rgba(0, 243, 255, 0.1), rgba(112, 0, 255, 0.15));
+            border: 1px solid rgba(0, 243, 255, 0.4);
+            color: #e0e6ed;
+            padding: 10px 14px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            text-align: center;
+        }
+        button.cyber-btn:hover {
+            background: linear-gradient(135deg, rgba(0, 243, 255, 0.3), rgba(112, 0, 255, 0.4));
+            border-color: #00f3ff;
+            box-shadow: 0 0 15px rgba(0, 243, 255, 0.4);
+            color: #fff;
+            transform: translateY(-1px);
+        }
+        button.cyber-btn.active {
+            background: linear-gradient(135deg, #00f3ff, #7000ff);
+            color: #05050a;
+            border-color: #fff;
+            box-shadow: 0 0 20px rgba(0, 243, 255, 0.6);
+        }
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(10, 10, 20, 0.75);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 12px 24px;
+            font-size: 13px;
+            color: #a0aec0;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background-color: #00ffcc;
+            border-radius: 50%;
+            box-shadow: 0 0 10px #00ffcc;
+            margin-right: 8px;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(0.95); opacity: 0.8; }
+            50% { transform: scale(1.2); opacity: 1; box-shadow: 0 0 15px #00ffcc; }
+            100% { transform: scale(0.95); opacity: 0.8; }
+        }
+        /* Loader Overlay */
+        #loader {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #05050a;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            transition: opacity 0.6s ease;
+        }
+        .spinner {
+            width: 60px;
+            height: 60px;
+            border: 3px solid rgba(0, 243, 255, 0.1);
+            border-top: 3px solid #00f3ff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            box-shadow: 0 0 20px rgba(0, 243, 255, 0.3);
+            margin-bottom: 20px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .loader-text {
+            font-size: 15px;
+            letter-spacing: 3px;
+            color: #00f3ff;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body>
+    <div id="loader">
+        <div class="spinner"></div>
+        <div class="loader-text" id="loader-status">Initializing Cyber Environment...</div>
+    </div>
+
+    <div id="webgl-container"></div>
+
+    <div class="ui-layer">
+        <header>
+            <h1>CYBER ROBOT 3D SHOWCASE</h1>
+            <div class="fps-counter" id="fps">FPS: --</div>
+        </header>
+
+        <div class="control-panel">
+            <div class="control-group">
+                <label>Robot Animation State</label>
+                <div class="btn-grid" id="anim-buttons">
+                    <!-- Dynamic buttons injected via JS -->
+                </div>
+            </div>
+            <div class="control-group">
+                <label>Exhibition Mode</label>
+                <button class="cyber-btn active" id="btn-rotate">Auto Turntable: ON</button>
+            </div>
+        </div>
+
+        <div class="status-bar">
+            <div><span class="status-indicator"></span>System Status: Online | GLTF & DRACO Pipeline Active</div>
+            <div>Engine: Three.js r160 + UnrealBloomPass</div>
+        </div>
+    </div>
+
+    <!-- Import Maps for ES Modules -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "./vendor/three.module.js",
+                "three/addons/": "./vendor/addons/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+        import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+        // State variables
+        let container, camera, scene, renderer, composer, controls;
+        let robot, mixer;
+        let animations = [];
+        let actionMap = {};
+        let activeAction;
+        let clock = new THREE.Clock();
+        let autoRotate = true;
+        let turntableAngle = 0;
+        let platformGroup;
+
+        const loaderStatus = document.getElementById('loader-status');
+        const loaderElem = document.getElementById('loader');
+
+        init();
+
+        function init() {
+            container = document.getElementById('webgl-container');
+
+            // 1. Scene Setup
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x05050a);
+            scene.fog = new THREE.FogExp2(0x05050a, 0.025);
+
+            // 2. Camera Setup
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+            camera.position.set(0.0, 2.5, 4.5);
+
+            // 3. Renderer Setup
+            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.2;
+            container.appendChild(renderer.domElement);
+
+            // 4. PMREM Environment (RoomEnvironment for realistic metallic reflections without dead-black areas)
+            const pmremGenerator = new THREE.PMREMGenerator(renderer);
+            scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
+
+            // 5. OrbitControls
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.target.set(0, 1.0, 0);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxPolarAngle = Math.PI / 2 - 0.02; // Don't go below ground
+            controls.minDistance = 2.0;
+            controls.maxDistance = 12.0;
+
+            // 6. Multi-Light Hierarchy
+            const ambientLight = new THREE.AmbientLight(0x203040, 1.5);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xffffff, 2.5);
+            dirLight.position.set(5, 10, 7);
+            dirLight.castShadow = true;
+            dirLight.shadow.mapSize.width = 2048;
+            dirLight.shadow.mapSize.height = 2048;
+            dirLight.shadow.bias = -0.0001;
+            scene.add(dirLight);
+
+            const rimLight = new THREE.DirectionalLight(0x00f3ff, 2.0);
+            rimLight.position.set(-6, 5, -6);
+            scene.add(rimLight);
+
+            // 7. Post-Processing (UnrealBloomPass for cinematic optical glow)
+            const renderScene = new RenderPass(scene, camera);
+            const bloomPass = new UnrealBloomPass(
+                new THREE.Vector2(window.innerWidth, window.innerHeight),
+                0.45, // strength
+                0.4,  // radius
+                0.85  // threshold
+            );
+
+            composer = new EffectComposer(renderer);
+            composer.addPass(renderScene);
+            composer.addPass(bloomPass);
+
+            // 8. Procedural Cyber Platform (Anti-Primitive / Complex Composite Geometry)
+            createCyberPlatform();
+
+            // 9. Load Robot Model with DRACO support and fallback
+            loadRobotModel();
+
+            // 10. Event Listeners
+            window.addEventListener('resize', onWindowResize);
+            setupUI();
+
+            // Start loop
+            animate();
+        }
+
+        function createCyberPlatform() {
+            platformGroup = new THREE.Group();
+
+            // Base cylinder pedestal
+            const baseGeo = new THREE.CylinderGeometry(2.2, 2.5, 0.3, 64);
+            const baseMat = new THREE.MeshStandardMaterial({
+                color: 0x111318,
+                roughness: 0.3,
+                metalness: 0.85
+            });
+            const baseMesh = new THREE.Mesh(baseGeo, baseMat);
+            baseMesh.receiveShadow = true;
+            platformGroup.add(baseMesh);
+
+            // Glowing ring on pedestal
+            const ringGeo = new THREE.TorusGeometry(2.1, 0.04, 16, 100);
+            const ringMat = new THREE.MeshBasicMaterial({
+                color: 0x00f3ff
+            });
+            const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+            ringMesh.rotation.x = Math.PI / 2;
+            ringMesh.position.y = 0.16;
+            platformGroup.add(ringMesh);
+
+            // Add grid floor
+            const grid = new THREE.GridHelper(30, 30, 0x00f3ff, 0x222233);
+            grid.position.y = -0.15;
+            scene.add(grid);
+
+            scene.add(platformGroup);
+        }
+
+        function createFallbackRobot() {
+            // Procedural composite robot fallback if GLTF loading fails
+            const robotGroup = new THREE.Group();
+            
+            const mat = new THREE.MeshStandardMaterial({
+                color: 0x223344,
+                roughness: 0.2,
+                metalness: 0.9
+            });
+            const accentMat = new THREE.MeshStandardMaterial({
+                color: 0x00f3ff,
+                emissive: 0x00f3ff,
+                emissiveIntensity: 0.8,
+                roughness: 0.1,
+                metalness: 0.5
+            });
+
+            // Torso
+            const torso = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.0, 0.5), mat);
+            torso.position.y = 1.2;
+            torso.castShadow = true;
+            robotGroup.add(torso);
+
+            // Head
+            const head = new THREE.Mesh(new THREE.SphereGeometry(0.35, 32, 32), mat);
+            head.position.y = 1.9;
+            head.castShadow = true;
+            robotGroup.add(head);
+
+            // Glowing visor
+            const visor = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.1, 0.2), accentMat);
+            visor.position.set(0, 1.9, 0.25);
+            robotGroup.add(visor);
+
+            scene.add(robotGroup);
+            robot = robotGroup;
+            loaderStatus.textContent = 'Render Engine Ready (Fallback Mode)';
+            setTimeout(() => {
+                loaderElem.style.opacity = '0';
+                setTimeout(() => loaderElem.style.display = 'none', 600);
+            }, 500);
+        }
+
+        function loadRobotModel() {
+            loaderStatus.textContent = 'Loading GLTF & DRACO Model...';
+            
+            const dracoLoader = new DRACOLoader();
+            dracoLoader.setDecoderPath('./vendor/addons/libs/draco/gltf/');
+
+            const gltfLoader = new GLTFLoader();
+            gltfLoader.setDRACOLoader(dracoLoader);
+
+            gltfLoader.load(
+                './models/RobotExpressive.glb',
+                function (gltf) {
+                    robot = gltf.scene;
+                    robot.position.set(0, 0, 0);
+                    robot.scale.set(0.75, 0.75, 0.75);
+                    
+                    robot.traverse(function (child) {
+                        if (child.isMesh) {
+                            child.castShadow = true;
+                            child.receiveShadow = true;
+                        }
+                    });
+
+                    scene.add(robot);
+
+                    // Setup animations
+                    animations = gltf.animations;
+                    if (animations && animations.length > 0) {
+                        mixer = new THREE.AnimationMixer(robot);
+                        
+                        // Populate UI animation buttons
+                        const animButtonsContainer = document.getElementById('anim-buttons');
+                        animButtonsContainer.innerHTML = '';
+
+                        // Pick key showcase animations
+                        const preferredAnims = ['Idle', 'Walk', 'Run', 'Dance', 'Wave', 'Death'];
+                        
+                        animations.forEach((clip) => {
+                            actionMap[clip.name] = mixer.clipAction(clip);
+                        });
+
+                        // Default action
+                        if (actionMap['Idle']) {
+                            activeAction = actionMap['Idle'];
+                            activeAction.play();
+                        } else if (animations[0]) {
+                            activeAction = mixer.clipAction(animations[0]);
+                            activeAction.play();
+                        }
+
+                        // Create UI buttons for available clips
+                        animations.forEach((clip) => {
+                            if (preferredAnims.includes(clip.name)) {
+                                const btn = document.createElement('button');
+                                btn.className = 'cyber-btn' + (clip.name === 'Idle' ? ' active' : '');
+                                btn.textContent = clip.name;
+                                btn.addEventListener('click', () => {
+                                    document.querySelectorAll('#anim-buttons .cyber-btn').forEach(b => b.classList.remove('active'));
+                                    btn.classList.add('active');
+                                    fadeToAction(clip.name, 0.5);
+                                });
+                                animButtonsContainer.appendChild(btn);
+                            }
+                        });
+                    }
+
+                    loaderStatus.textContent = 'Cyber Environment Online';
+                    setTimeout(() => {
+                        loaderElem.style.opacity = '0';
+                        setTimeout(() => loaderElem.style.display = 'none', 600);
+                    }, 500);
+                },
+                function (xhr) {
+                    if (xhr.total) {
+                        const percent = Math.floor((xhr.loaded / xhr.total) * 100);
+                        loaderStatus.textContent = `Loading Assets: ${percent}%`;
+                    }
+                },
+                function (error) {
+                    console.warn('GLTF load failed, switching to procedural fallback:', error);
+                    createFallbackRobot();
+                }
+            );
+        }
+
+        function fadeToAction(name, duration) {
+            const nextAction = actionMap[name];
+            if (!nextAction || nextAction === activeAction) return;
+
+            nextAction.reset();
+            nextAction.setEffectiveTimeScale(1);
+            nextAction.setEffectiveWeight(1);
+            nextAction.crossFadeFrom(activeAction, duration, true);
+            nextAction.play();
+            activeAction = nextAction;
+        }
+
+        function setupUI() {
+            const btnRotate = document.getElementById('btn-rotate');
+            btnRotate.addEventListener('click', () => {
+                autoRotate = !autoRotate;
+                btnRotate.classList.toggle('active', autoRotate);
+                btnRotate.textContent = `Auto Turntable: ${autoRotate ? 'ON' : 'OFF'}`;
+            });
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // FPS calculation
+        let frameCount = 0;
+        let fpsValue = 60;
+        let fpsElem = document.getElementById('fps');
+        let lastTime = performance.now();
+
+        function updateFPS() {
+            const now = performance.now();
+            frameCount++;
+            if (now - lastTime >= 1000) {
+                fpsValue = Math.round((frameCount * 1000) / (now - lastTime));
+                fpsElem.textContent = `FPS: ${fpsValue}`;
+                frameCount = 0;
+                lastTime = now;
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            updateFPS();
+
+            const delta = clock.getDelta();
+
+            if (mixer) {
+                mixer.update(delta);
+            }
+
+            if (autoRotate && platformGroup) {
+                turntableAngle += delta * 0.2;
+                platformGroup.rotation.y = turntableAngle;
+                if (robot && !mixer) {
+                    robot.rotation.y = turntableAngle;
+                }
+            }
+
+            controls.update();
+            composer.render();
+        }
+    </script>
+</body>
+</html>
