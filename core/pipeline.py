@@ -175,9 +175,10 @@ class PipelineOrchestrator:
             default_bus.publish(EventType.TDD_CYCLE, {"loop": loop_count, "status": "tests_failed", "details": verif["error_details"]})
 
             repair_task = (
-                f"【测试未通过，进入代码自修复第 {loop_count} 轮】\n"
-                f"错误详情如下：\n{verif['error_details']}\n\n"
-                f"请阅读报错信息、对应源代码及测试文件，修正代码中的缺陷，确保测试能够通过。\n"
+                f"【测试或审美验收未通过，进入代码自修复第 {loop_count} 轮】\n"
+                f"未通过详情如下：\n{verif['error_details']}\n\n"
+                f"请仔细阅读未通过详情、测试报告（{test_report_file}）、设计审美审查报告（deliverables/design_audit.md，若存在）以及验收燃尽清单（deliverables/acceptance_criteria.md），\n"
+                f"修正代码逻辑缺陷并精修模型结构与光影材质，确保测试用例与审美验收项全部达成并通过。\n"
                 f"将修复说明写入：{coder_output}"
             )
             repair_res = coder_harness.run(repair_task, output_file=coder_output)

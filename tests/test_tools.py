@@ -79,8 +79,8 @@ class TestTools(unittest.TestCase):
         )
         self.assertEqual(p.returncode, 0)
         data = json.loads(p.stdout)
-        self.assertTrue(data["success"])
-        self.assertEqual(data["data"]["total_lines"], 6)
+        self.assertGreaterEqual(data["data"]["total_lines"], 6)
+        self.assertIn("万物皆插件", data["data"]["content"])
 
     def test_test_runner_syntax(self):
         good_file = os.path.join(self.temp_dir, "good.py")

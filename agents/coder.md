@@ -45,9 +45,12 @@ gate_rules:
    - 编写完代码后，主动调用相应的测试与校验工具（如 `test_runner`、`web_validator`、`browser_test` 等）进行自测验证。
    - 必须使用 `write` 工具将所修改的代码清单、实现思路及关键逻辑记录在指定的输出文件中。
 
-5. **前沿技术搜索与高阶视效工程（Web Search & 3D Engineering）**：
+5. **技术检索与三维视效工程规范（Web Search & 3D Engineering First Principles）**：
    - 面对复杂算法、图形学渲染、未熟悉的开源生态时，主动调用 `web_search` 检索业界最新技术文档与代码范例。
-   - **3D 场景与三维建模工业级精细化规范**：
-     - **杜绝塑料玩具/乐高感**：严禁裸拼光滑基础几何体！在纯代码环境下，必须在内存中通过 HTML5 Canvas 动态绘制程序化装甲机甲法线贴图与粗糙度贴图 (Procedural Greeble Normal Map & Roughness Map)，赋予模型深邃的机械接缝、螺栓与刻线阴影。
-     - **电影级后期光效 (Bloom)**：场景必须集成后期泛光通道（如 `UnrealBloomPass` / `EffectComposer`），使高能光束、霓虹边框、反应堆流光产生沉浸式辉光，避免死白或硬边实心感。
-     - **外部高精模型资产支持**：支持并推荐引入真实 `.gltf` / `.glb` / `.obj` 航天器模型，使用前必须通过本地放置或 `vendor_assets` 确认资源可达，彻底消除 404 加载风险。
+   - **三维场景与数字建模通用工程规范（全题材通用）**：
+     - **反乐高积木/反简单几何体原则 (Anti-Primitive)**：无论构建何种题材（机械工业、交通工具、现代建筑、智慧城市、生物医疗、日常产品或概念场景），**严禁裸拼光滑基础立方体/球体/圆柱体**。必须使用复合造型（如 `TubeGeometry` 曲线管道、`LatheGeometry` 旋转体、`ExtrudeGeometry` 挤出截面、倒角微结构及多级层次装配体 Group），体现符合物理世界的结构层次。
+     - **通用内存程序化贴图算法 (Procedural Canvas Textures)**：在免构建或无外部素材环境下，必须在内存中通过 HTML5 2D Canvas 动态绘制切线空间**法线贴图 (Normal Map)** 与 **粗糙度贴图 (Roughness Map)**。以 `rgb(128,128,255)` 为平整基准，根据题材绘制微观起伏坡度向量（如硬表面的接缝与紧固件、建筑的砌体微孔与拼缝、有机体的肌理噪点），赋予 PBR 物理材质真实的微观漫反射与高光，彻底消除塑料玩具感。
+     - **电影级后期泛光与光学辉光 (Optical Bloom)**：发光材质（自发光指示灯、车灯、发光线条、高亮核心、HUD 荧光）必须接入后期合成管线（`EffectComposer` + `RenderPass` + `UnrealBloomPass`），配合 `emissive` 自发光与合理的辉光阈值，产生真实镜头光学光晕漫射，杜绝平面实心死板单色。
+     - **充沛的多重光照体系 (Multi-Light Hierarchy)**：配置半球漫反射天光 (HemisphereLight) 确保背光面通透不死黑，主平行光投射清晰阴影，逆向轮廓光 (Rim Light) 提拔空间纵深。
+     - **外部高精模型支持与容灾 (Resilient External Assets)**：支持引入业界标准 `.gltf` / `.glb` / `.obj` 资产；使用前必须通过本地放置或 `vendor_assets` 下载缓存到本地，彻底消除 404 风险；且必须提供加载失败时的程序化备用降级渲染逻辑。
+
