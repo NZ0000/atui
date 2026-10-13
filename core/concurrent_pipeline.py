@@ -888,6 +888,26 @@ class ConcurrentModularPipeline:
                 target_files = ["index.js"]  # fallback
 
         fix_results = {}
+
+        def _acquire_wave_locks():
+            # Exclusive write ownership per wave: each target file locked by its
+            # worker; unassigned files stay writable by anyone.
+            try:
+                from tools.write import acquire_write_lock
+                for _f in target_files:
+                    acquire_write_lock(os.path.join(proj.path, _f), f"worker:{_f}")
+            except Exception:
+                pass
+
+        def _release_wave_locks():
+            try:
+                from tools.write import release_write_lock
+                for _f in target_files:
+                    release_write_lock(os.path.join(proj.path, _f), f"worker:{_f}")
+            except Exception:
+                pass
+
+        _acquire_wave_locks()
         with concurrent.futures.ThreadPoolExecutor(max_workers=min(self.max_workers, len(target_files))) as executor:
             future_to_file = {
                 executor.submit(
@@ -915,6 +935,7 @@ class ConcurrentModularPipeline:
                 except Exception as exc:
                     fix_results[fname] = {"success": False, "error": str(exc)}
 
+        _release_wave_locks()
         stage_records.append({"stage": "concurrent_fix", "results": fix_results})
 
         # ------------------------------------------------------------------
@@ -925,7 +946,7 @@ class ConcurrentModularPipeline:
         gate_verdict: Dict[str, Any] = {}
         if gate_spec:
             default_bus.publish(EventType.PIPELINE_STEP, {"stage": "global_condition_gate"})
-            gate_res = tools.execute_tool("condition_gate", {"conditions": gate_spec})
+            gate_res = tools.execute_tool("condition_gate", {"conditions": gate_spec, "root_dir": proj.path})
             gate_verdict = gate_res.get("data", {}) if isinstance(gate_res, dict) else {}
             conditions_passed = bool(gate_verdict.get("passed", False))
 
@@ -956,6 +977,8 @@ class ConcurrentModularPipeline:
                         "stage": "consult_error", "error": str(exc)
                     })
                 # One repair wave: re-dispatch fix workers with failure evidence + remediation
+                _release_wave_locks()
+                _acquire_wave_locks()
                 repair_results = {}
                 with concurrent.futures.ThreadPoolExecutor(
                     max_workers=min(self.max_workers, len(target_files))
@@ -983,8 +1006,9 @@ class ConcurrentModularPipeline:
                 for fname, res in repair_results.items():
                     if res.get("success"):
                         fix_results[fname] = res
+                _release_wave_locks()
                 # Final re-evaluation
-                gate_res2 = tools.execute_tool("condition_gate", {"conditions": gate_spec})
+                gate_res2 = tools.execute_tool("condition_gate", {"conditions": gate_spec, "root_dir": proj.path})
                 gate_verdict = gate_res2.get("data", {}) if isinstance(gate_res2, dict) else {}
                 conditions_passed = bool(gate_verdict.get("passed", False))
 
@@ -1089,7 +1113,9 @@ class ConcurrentModularPipeline:
         strict_pass = conditions_passed and len(failed_files) == 0
         # Partial-success policy: if the program RUNS CLEAN (no console errors)
         # and at least one worker succeeded, keep the progress instead of wiping it.
-        partial_pass = (run_ok is True) and any_success
+        # run_ok=None (browser infra unavailable) trusts the audit chain instead of
+        # hard-failing — only CONFIRMED breakage triggers a rollback.
+        partial_pass = (run_ok is not False) and any_success
         if strict_pass or partial_pass:
             if not strict_pass and partial_pass:
                 warn = f"partial commit: conditions not fully met ({gate_verdict.get('failure_summary', '')}); runtime clean, progress kept"
@@ -1376,6 +1402,13 @@ class ConcurrentModularPipeline:
         mod_name = os.path.splitext(os.path.basename(target_file))[0]
         coder_role = Role.from_file(self._get_agent_path("coder"))
         worker_coder = AgentHarness(coder_role, model=active_model)
+        # Stamp this worker thread with its writer identity so the write tool
+        # can distinguish the rightful owner from cross-writers.
+        try:
+            from tools.write import set_current_writer, clear_current_writer
+            set_current_writer(f"worker:{target_file}")
+        except Exception:
+            clear_current_writer = None
 
         loop = 0
         passed = False
@@ -1400,7 +1433,13 @@ class ConcurrentModularPipeline:
                 f"且资产文件必须使用语义化命名（如 flamingo.glb、lantern.glb），严禁 asset_1.glb 之类的数字/无意义命名。\n"
                 f"若你编写了临时检测脚本（如资产引用校验脚本），必须在报告首部声明一行：CHECK_SCRIPT: <相对项目根的脚本路径>；"
                 f"脚本会在验收门禁被强制语法检测并运行，exit 0 才放行。\n"
-                f"修复完成后必须真实修改 `{target_file}` 的源码内容（只写报告不改代码将判定为失败并触发返工），然后将改动说明写入：{coder_out}"
+                f"修复完成后必须真实修改 `{target_file}` 的源码内容（只写报告不改代码将判定为失败并触发返工），然后将改动说明写入：{coder_out}\n"
+                f"【并发协作规则】\n"
+                f"- `{target_file}` 由你独占负责；其它 Worker 正在负责的文件被锁定，写入会收到 FILE_LOCKED 错误——"
+                f"收到该错误时先完成你自己的文件，稍后重试，严禁强行抢占。\n"
+                f"- 未被任何 Worker 指派的文件（如新增辅助文件）可以直接修改。\n"
+                f"- 开工前先调用 blackboard 工具（action=get, topic=file_changes）查看其它文件的最新变更通知，"
+                f"避免按过期接口写代码；若你需要其它文件的特定配合，用 blackboard（action=post, topic=coordination）留言。"
             )
             if last_error:
                 coder_task += f"\n\n上一轮审查驳回原因：{last_error}\n请有针对性地修正！"
@@ -1454,7 +1493,7 @@ class ConcurrentModularPipeline:
                 if tamper:
                     last_error = f"{tamper}（判定以管线内存中的原始条件为准；你的自检脚本仅为自检，不构成验收依据）"
                     continue
-                gate = tools.execute_tool("condition_gate", {"conditions": conditions})
+                gate = tools.execute_tool("condition_gate", {"conditions": conditions, "root_dir": project_path})
                 gate_data = gate.get("data", {}) if isinstance(gate, dict) else {}
                 if not gate_data.get("passed", False):
                     last_error = (
@@ -1486,10 +1525,33 @@ class ConcurrentModularPipeline:
                 pass
 
             passed = True
+            # Broadcast what this worker changed so concurrent/later workers can
+            # adapt (e.g. interface changes) instead of coding against stale code.
+            try:
+                fix_abs = os.path.join(project_path, coder_out)
+                brief = ""
+                if os.path.exists(fix_abs):
+                    with open(fix_abs, "r", encoding="utf-8") as ff:
+                        brief = ff.read()[:400]
+                tools.execute_tool("blackboard", {
+                    "action": "post",
+                    "topic": "file_changes",
+                    "key": target_file,
+                    "value": {"loops": loop, "summary": brief},
+                    "author": f"worker:{target_file}"
+                })
+            except Exception:
+                pass
 
-        return {
-            "file": target_file,
-            "success": passed,
-            "loops": loop,
-            "error": last_error if not passed else ""
-        }
+        try:
+            return {
+                "file": target_file,
+                "success": passed,
+                "loops": loop,
+                "error": last_error if not passed else ""
+            }
+        finally:
+            try:
+                clear_current_writer()
+            except Exception:
+                pass

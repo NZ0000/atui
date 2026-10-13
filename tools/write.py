@@ -8,12 +8,63 @@ Supports both Python function calling and CLI argument invocation.
 import os
 import sys
 import difflib
+import threading
 from typing import Dict, Any, Optional
 
 try:
     from tools.base import make_result, cli_runner, resolve_project_path
 except ImportError:
     from base import make_result, cli_runner, resolve_project_path
+
+# ---------------------------------------------------------------------------
+# Cross-agent file ownership registry (in-process, thread-safe).
+# Files assigned to a worker are locked for the duration of that worker's run:
+# any OTHER agent attempting to write them gets FILE_LOCKED and must wait for
+# the owner to finish (retry later) or coordinate via the blackboard.
+# Unassigned files carry no lock and may be modified by anyone.
+# ---------------------------------------------------------------------------
+_FILE_LOCKS: Dict[str, str] = {}
+_LOCK_GUARD = threading.Lock()
+
+
+def acquire_write_lock(path: str, owner: str) -> bool:
+    """Claim exclusive write ownership of an absolute path. Returns False if held."""
+    ap = os.path.abspath(path)
+    with _LOCK_GUARD:
+        holder = _FILE_LOCKS.get(ap)
+        if holder and holder != owner:
+            return False
+        _FILE_LOCKS[ap] = owner
+        return True
+
+
+def release_write_lock(path: str, owner: str) -> None:
+    ap = os.path.abspath(path)
+    with _LOCK_GUARD:
+        if _FILE_LOCKS.get(ap) == owner:
+            del _FILE_LOCKS[ap]
+
+
+def lock_holder(path: str) -> Optional[str]:
+    with _LOCK_GUARD:
+        return _FILE_LOCKS.get(os.path.abspath(path))
+
+
+# Thread-local writer identity: the pipeline stamps each worker thread with its
+# owner id so write_file can distinguish the rightful owner from cross-writers.
+_WRITER_CTX = threading.local()
+
+
+def set_current_writer(owner: str) -> None:
+    _WRITER_CTX.owner = owner
+
+
+def clear_current_writer() -> None:
+    _WRITER_CTX.owner = None
+
+
+def _current_writer() -> Optional[str]:
+    return getattr(_WRITER_CTX, "owner", None)
 
 TOOL_SPEC = {
     "name": "write",
@@ -55,6 +106,16 @@ def write_file(
     replacement_chunk: Optional[str] = None
 ) -> Dict[str, Any]:
     path = resolve_project_path(path)
+    # Ownership guard: deny cross-writes to files locked by another agent.
+    # The rightful owner (stamped via thread-local) may write its own file;
+    # files with no lock are free for anyone.
+    holder = lock_holder(path)
+    if holder and holder != _current_writer():
+        return make_result(False, error=(
+            f"FILE_LOCKED: '{path}' is being modified by '{holder}'. "
+            f"Do not cross-edit concurrently — wait until that worker finishes "
+            f"(retry later) or coordinate via the blackboard tool."
+        ))
     parent = os.path.dirname(os.path.abspath(path))
     if parent and not os.path.exists(parent):
         try:

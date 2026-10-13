@@ -343,3 +343,43 @@ def test_acceptance_authority_helpers():
         # delete file
         os.remove(os.path.join(tmp, "deliverables", "acceptance_conditions.json"))
         assert "删除" in pipeline._conditions_tamper_error(tmp, h1)
+
+
+def test_write_lock_mutex_and_denial():
+    """Assigned-file lock: same owner re-acquires OK; other owner denied at write time."""
+    import tempfile
+    from tools.write import acquire_write_lock, release_write_lock, write_file
+
+    with tempfile.TemporaryDirectory() as tmp:
+        p = os.path.join(tmp, "index.js")
+        open(p, "w").write("const a = 1;\n")
+        assert acquire_write_lock(p, "worker:index.js") is True
+        # same owner can re-acquire (idempotent)
+        assert acquire_write_lock(p, "worker:index.js") is True
+        # other owner denied at write time with FILE_LOCKED
+        res = write_file(p, content="hacked")
+        assert res["success"] is False and "FILE_LOCKED" in res["error"]
+        # owner thread (stamped identity) can write its own file
+        from tools.write import set_current_writer, clear_current_writer
+        set_current_writer("worker:index.js")
+        try:
+            res_ok = write_file(p, content="const a = 2;\n")
+            assert res_ok["success"] is True
+        finally:
+            clear_current_writer()
+        release_write_lock(p, "worker:index.js")
+        # after release, anyone can write (unassigned file)
+        res_free = write_file(p, content="const a = 3;\n")
+        assert res_free["success"] is True
+
+
+def test_blackboard_change_broadcast():
+    """Worker success posts file_changes entry readable via blackboard get."""
+    import tools
+    tools.discover_tools()
+    tools.execute_tool("blackboard", {"action": "post", "topic": "file_changes",
+                                      "key": "modules/x.js", "value": {"loops": 1, "summary": "s"},
+                                      "author": "worker:modules/x.js"})
+    got = tools.execute_tool("blackboard", {"action": "get", "topic": "file_changes", "key": "modules/x.js"})
+    entries = got.get("data") or []
+    assert any((e.get("value") or {}).get("summary") == "s" for e in (entries if isinstance(entries, list) else [entries]))
