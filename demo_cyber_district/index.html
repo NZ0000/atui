@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sci-Fi Cyber District 3D Composite Showcase</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #050811;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #ffffff;
+            user-select: none;
+        }
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+            background: rgba(10, 15, 30, 0.85);
+            border: 1px solid #00f0ff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(0, 240, 255, 0.3);
+            pointer-events: auto;
+            max-width: 320px;
+        }
+        h1 {
+            font-size: 18px;
+            margin: 0 0 10px 0;
+            color: #00f0ff;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+        p {
+            font-size: 12px;
+            color: #a0aec0;
+            margin: 0 0 15px 0;
+            line-height: 1.4;
+        }
+        .btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        button {
+            background: linear-gradient(135deg, #00f0ff 0%, #0077ff 100%);
+            border: none;
+            color: #ffffff;
+            padding: 10px 15px;
+            font-size: 12px;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        button:hover {
+            opacity: 0.9;
+            box-shadow: 0 0 15px rgba(0, 240, 255, 0.6);
+            transform: translateY(-1px);
+        }
+        #status-bar {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            z-index: 100;
+            background: rgba(10, 15, 30, 0.85);
+            border: 1px solid #ff0055;
+            padding: 10px 15px;
+            border-radius: 6px;
+            font-size: 11px;
+            color: #ff0055;
+            letter-spacing: 0.5px;
+            box-shadow: 0 0 15px rgba(255, 0, 85, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div id="hud">
+        <h1>Cyber District HUD</h1>
+        <p>Deep Space sci-fi composite scene featuring modular architecture, instanced alien forest, holographic street beacons, and AI patrol units.</p>
+        <div class="btn-group">
+            <button id="btn-reset">Reset Camera Position</button>
+            <button id="btn-time">Switch Day/Night (Night)</button>
+        </div>
+    </div>
+
+    <div id="status-bar">
+        STATUS: ONLINE | 60 FPS | INSTANCED MESH ACTIVE
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "./vendor/three/three.module.js"
+            }
+        }
+    </script>
+    <script type="module" src="index.js"></script>
+</body>
+</html>
