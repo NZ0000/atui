@@ -8,7 +8,7 @@
    - 静态核查 Three.js EffectComposer 必须显式配置 `{ samples: 4 }`（WebGL 2 硬件 4x MSAA 抗锯齿）；
    - 严查测试用例断言篡改行为。
 3. **通用三维视觉第一性原理**：
-   - **反积木/反简单几何体**：严禁仅堆叠光滑立方体/球体；优先调用 `vendor_assets` 工具下载并装配工业级模型资产（如 `helmet` - DamagedHelmet AAA PBR 战损头盔），且必须编写异步容灾降级渲染逻辑；
+   - **反积木/反简单几何体**：严禁仅堆叠光滑立方体/球体；优先调用 `vendor_assets` 工具下载并装配工业级模型资产（如 `helmet` - 下载自包含单文件 `models/DamagedHelmet.glb`），且必须编写异步容灾降级渲染逻辑；模型加载完成后必须立即隐藏 Loading 遮罩；
    - **360° 环境反射**：必须引入 `RoomEnvironment` + `PMREMGenerator` 离屏环境反射贴图，彻底消除金属材质旋转背光死黑；
    - **曲面法线平滑插值**：材质严禁开启面片生硬切角（`flatShading: false`），模型初始化时执行 `geometry.computeVertexNormals()`；
    - **电影级后期辉光与硬件抗锯齿**：发光部件（面罩/全息指示灯）必须接入 `EffectComposer` + `UnrealBloomPass` 产生真实光学光晕；`WebGLRenderTarget` 必须配置 `samples: 4` 硬件 MSAA 抗锯齿，消除像素狗牙。

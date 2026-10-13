@@ -56,5 +56,5 @@ gate_rules:
      - **曲面法线平滑与反面片折痕 (Smooth Normal Shading)**：
        - 严禁曲面呈现生硬的低模切片棱角；加载或创建模型后必须确保材质平滑着色（`material.flatShading = false`），并调用 `geometry.computeVertexNormals()` 重新插值法向量，使曲面受光与高光如丝般平滑。
      - **充沛的多重光照体系 (Multi-Light Hierarchy)**：配置半球漫反射天光 (HemisphereLight) 确保背光面通透不死黑，主平行光投射清晰阴影，逆向轮廓光 (Rim Light) 提拔空间纵深。
-     - **外部高精模型支持与容灾 (Resilient External Assets)**：支持引入业界标准 `.gltf` / `.glb` / `.obj` 资产；使用前必须通过本地放置或 `vendor_assets` 下载缓存到本地，彻底消除 404 风险；且必须提供加载失败时的程序化备用降级渲染逻辑。
+     - **外部高精模型支持与容灾 (Resilient External Assets)**：优先通过 `vendor_assets` 工具下载自包含单文件 `.glb` 资产（如 `helmet` 对应 `models/DamagedHelmet.glb`），并在加载成功后立刻隐藏 Loading 遮罩；严禁加载缺失子贴图的残缺 `.gltf`；且必须提供加载失败时的程序化备用降级渲染逻辑。
 

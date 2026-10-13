@@ -39,9 +39,10 @@
 5. **曲面法线平滑插值 (Smooth Normal Shading)**：
    - 严禁曲面呈现生硬的低模多边形切面折痕；加载或构建模型必须确保材质开启平滑着色（`flatShading: false`），并调用 `geometry.computeVertexNormals()` 插值平滑法线。
 6. **外部模型高精资产容灾标准 (Resilient External Assets)**：
-   - 允许且鼓励使用工业级 `.gltf` / `.glb` / `.obj` 外部模型；
-   - 必须通过本地资源管理或 `vendor_assets` 工具下载缓存到本地，严禁依赖不稳定的公网 CDN URL 导致 404 崩溃；
-   - 必须编写异步加载容灾逻辑（Fallback），在外部资产缺失或加载超时时自动降级到程序化精细模型，确保 100% 正常运行。
+   - 允许且鼓励使用工业级 `.glb` / `.gltf` 外部模型；
+   - 优先通过 `vendor_assets` 工具一键下载落地自包含 `.glb` 单文件资产（例如 `helmet` 预置对应 `models/DamagedHelmet.glb`，`car` 预置对应 `models/ferrari.glb`，`robot` 预置对应 `models/RobotExpressive.glb`），其自包含二进制内嵌全部 PBR 贴图，杜绝丢失子贴图导致的 404 崩溃；
+   - 严禁手写冗余脚本下载外部残缺 `.gltf`，直接通过 `loader.load('./models/DamagedHelmet.glb')` 加载落地模型；
+   - 必须编写异步加载容灾逻辑（Fallback），在外部资产缺失或加载超时时自动降级到程序化精细复合模型，并在模型入场后立刻隐藏 Loading 遮罩层，确保 100% 正常呈现。
 
 ## 四、执行能效与零冗余原则
 1. **原生路径自动创建**：系统 `write` 工具原生支持递归创建任何深度的父目录。严禁在写文件前冗余调用 `mkdir -p`，严禁无目的调用 `ls -la` 浪费轮次。
