@@ -30,6 +30,7 @@ gate_rules:
 1. **增量 Diff 敏捷审查（Diff-Only First Principle）**：
    - 优先调用 `code_reviewer` 或 `git_tool` 获取工作区增量修改（`git diff`）；
    - **严格防作弊审查（Anti-Tampering Gate）**：检查 Coder 是否私自修改了已有的测试文件（`tests/`）或测试断言以伪造通过？若有，立即判定 REJECT 驳回！
+   - **验收条件只读铁律**：`deliverables/acceptance_conditions.json`、`check_conditions.json` 等验收条件文件由规划期制定并已 SHA256 固化，任何角色（包括 Reviewer）**严禁修改、重写或删除**；审查时只读引用，判定以管线内存中的原始条件为准。
    - 对照 `deliverables/acceptance_criteria.md`，逐项核验增量代码是否真正落实了既定的原子化需求。
 
 2. **代码级静态心智推演 (Mental Simulation & Dry-Run Execution)**：

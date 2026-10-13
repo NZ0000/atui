@@ -33,8 +33,8 @@ TOOL_SPEC = {
         "properties": {
             "action": {
                 "type": "string",
-                "enum": ["search", "extract_symbols", "extract_related", "file_outline", "detect_pitfalls", "query_knowledge"],
-                "description": "分析操作：search (全项目正则/文本搜索), extract_symbols (提取类/函数/导入导出), extract_related (追踪关联调用与引用), file_outline (快速提取结构大纲), detect_pitfalls (扫描常见Bug与隐患), query_knowledge (检索Bug经验知识库)"
+                "enum": ["search", "extract_symbols", "extract_related", "file_outline", "detect_pitfalls", "query_knowledge", "asset_audit"],
+                "description": "分析操作：search (全项目正则/文本搜索), extract_symbols (提取类/函数/导入导出), extract_related (追踪关联调用与引用), file_outline (快速提取结构大纲), detect_pitfalls (扫描常见Bug与隐患), query_knowledge (检索Bug经验知识库), asset_audit (盘点3D资产：glb内嵌名称+代码引用+放置坐标+缺失引用，用于资产-场景一致性审查)"
             },
             "query": {
                 "type": "string",
@@ -422,6 +422,12 @@ def execute(params: Dict[str, Any]) -> Dict[str, Any]:
         file_path = params.get("file_path")
         return detect_pitfalls(file_path, root_dir)
 
+    elif action == "asset_audit":
+        return _asset_audit(
+            root_dir=params.get("root_dir"),
+            file_pattern=params.get("file_pattern")
+        )
+
     elif action == "query_knowledge":
         query = params.get("query")
         topic = params.get("topic")
@@ -429,6 +435,100 @@ def execute(params: Dict[str, Any]) -> Dict[str, Any]:
 
     else:
         return make_result(False, error=f"Unknown analyzer action '{action}'.")
+
+
+def _parse_glb_name(path: str) -> str:
+    """Extract the embedded asset name from a glTF-binary JSON chunk (empty on failure)."""
+    try:
+        import struct
+        with open(path, "rb") as f:
+            head = f.read(20)
+            if len(head) < 20 or head[:4] != b"glTF":
+                return ""
+            json_len = struct.unpack_from("<I", head, 12)[0]
+            raw = f.read(min(json_len, 1 << 20))
+            import json as _json
+            meta = _json.loads(raw.decode("utf-8", errors="ignore"))
+        name = (meta.get("asset") or {}).get("extras", {}).get("title", "") if isinstance(meta, dict) else ""
+        if not name and isinstance(meta, dict):
+            nodes = meta.get("nodes") or []
+            meshes = meta.get("meshes") or []
+            name = (nodes[0].get("name", "") if nodes else "") or (meshes[0].get("name", "") if meshes else "")
+        return str(name)
+    except Exception:
+        return ""
+
+
+def _asset_audit(root_dir: Optional[str] = None, file_pattern: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Inventory 3D assets vs code usage (project-agnostic, evidence for asset-scene
+    coherence review): for every .glb/.gltf under models/ report its embedded name;
+    for every code reference report the referencing file and placement coordinates;
+    flag references to files that do not exist on disk.
+    """
+    root = os.path.normpath(root_dir or _get_project_root())
+    assets_dir = os.path.join(root, "models")
+    files = []
+    if os.path.isdir(assets_dir):
+        for fn in sorted(os.listdir(assets_dir)):
+            if fn.lower().endswith((".glb", ".gltf")):
+                files.append(fn)
+    inventory = {}
+    for fn in files:
+        ap = os.path.join(assets_dir, fn)
+        inventory[fn] = {
+            "file": f"models/{fn}",
+            "embedded_name": _parse_glb_name(ap),
+            "size_bytes": os.path.getsize(ap),
+            "referenced_by": [],
+            "placements": [],
+        }
+    # scan code for references + placement coordinates
+    ref_re = re.compile(r"models/([\w./-]+\.(?:glb|gltf))")
+    pos_re = re.compile(r"\.position\.set\(\s*([-\d.]+)\s*,\s*([-\d.]+)\s*,\s*([-\d.]+)\s*\)")
+    missing = []
+    code_files = _iter_text_files(root, file_pattern) if "_iter_text_files" in globals() else _walk_code_files(root)
+    for cf, text in code_files:
+        rel = os.path.relpath(cf, root).replace(os.sep, "/")
+        for m in ref_re.finditer(text):
+            target = m.group(1)
+            if target not in inventory:
+                missing.append({"ref": f"models/{target}", "referenced_by": rel})
+                continue
+            inv = inventory[target]
+            inv["referenced_by"].append(rel)
+            # placement: nearest position.set within 400 chars after the load call
+            seg = text[m.end():m.end() + 400]
+            pm = pos_re.search(seg)
+            if pm:
+                inv["placements"].append({
+                    "file": rel, "x": float(pm.group(1)), "y": float(pm.group(2)), "z": float(pm.group(3))
+                })
+    unreferenced = [v["file"] for v in inventory.values() if not v["referenced_by"]]
+    return make_result(True, data={
+        "asset_count": len(inventory),
+        "assets": list(inventory.values()),
+        "missing_refs": missing,
+        "unreferenced_assets": unreferenced,
+        "hint": "用 embedded_name 判断资产内容与场景主题是否匹配；用 placements 的 y 值对照场景水面/地面阈值判断空间合理性。语义判断由审查者完成。"
+    })
+
+
+def _walk_code_files(root: str):
+    """Yield (path, text) for source files under root, skipping binaries/vendor."""
+    skip_dirs = {"node_modules", ".git", "vendor", "models", "deliverables", "__pycache__"}
+    skip_ext = (".glb", ".gltf", ".png", ".jpg", ".jpeg", ".webp", ".ico", ".bin", ".ktx2", ".woff", ".woff2")
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [d for d in dirnames if d not in skip_dirs]
+        for fn in filenames:
+            if fn.lower().endswith(skip_ext):
+                continue
+            ap = os.path.join(dirpath, fn)
+            try:
+                with open(ap, "r", encoding="utf-8", errors="ignore") as f:
+                    yield ap, f.read()
+            except Exception:
+                continue
 
 
 if __name__ == "__main__":

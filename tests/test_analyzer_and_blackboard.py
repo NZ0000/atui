@@ -158,3 +158,36 @@ def test_analyzer_tool_search_and_extract():
     })
     assert res_know["success"] is True
     assert "samples: 4" in str(res_know["data"])
+
+
+def test_analyzer_asset_audit():
+    """asset_audit inventories glb assets, code refs, placements and missing refs."""
+    import struct as _struct
+
+    with tempfile.TemporaryDirectory() as tmp:
+        os.makedirs(os.path.join(tmp, "models"))
+        meta = json.dumps({"asset": {"version": "2.0"}, "nodes": [{"name": "Flamingo"}], "meshes": []}).encode()
+        glb = b"glTF" + _struct.pack("<II", 2, 12 + 8 + len(meta)) + _struct.pack("<I", len(meta)) + b"JSON" + meta
+        with open(os.path.join(tmp, "models", "flamingo.glb"), "wb") as f:
+            f.write(glb)
+        with open(os.path.join(tmp, "models", "unused.glb"), "wb") as f:
+            f.write(glb)
+        with open(os.path.join(tmp, "index.js"), "w") as f:
+            f.write("loader.load('models/flamingo.glb', g => { g.scene.position.set(2, 1.5, 3); });\n"
+                    "loader.load('models/ghost.glb', g => {});")
+
+        res = tools.execute_tool("analyzer", {"action": "asset_audit", "root_dir": tmp})
+        data = res["data"]
+        assert data["asset_count"] == 2
+        flamingo = next(a for a in data["assets"] if a["file"] == "models/flamingo.glb")
+        assert flamingo["embedded_name"] == "Flamingo"
+        assert "index.js" in flamingo["referenced_by"]
+        assert flamingo["placements"] and flamingo["placements"][0]["y"] == 1.5
+        assert any(m["ref"] == "models/ghost.glb" for m in data["missing_refs"])
+        assert "models/unused.glb" in data["unreferenced_assets"]
+
+
+def test_analyzer_asset_audit_empty_project():
+    res = tools.execute_tool("analyzer", {"action": "asset_audit", "root_dir": tempfile.mkdtemp()})
+    assert res["success"] is True
+    assert res["data"]["asset_count"] == 0
