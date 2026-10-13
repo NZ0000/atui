@@ -795,6 +795,51 @@ class ConcurrentModularPipeline:
         })
 
         # ------------------------------------------------------------------
+        # Phase 0.5: Acceptance authority (三权分离)
+        # Acceptance conditions are authored BEFORE coding by the analyst
+        # (or supplied by the user via CLI), pinned by SHA256, and evaluated
+        # by the harness. Coders can NEVER author or alter acceptance criteria.
+        # ------------------------------------------------------------------
+        pinned_hash = ""
+        if not gate_spec:
+            try:
+                analyst_harness = AgentHarness(
+                    Role.from_file(self._get_agent_path("analyst")), model=active_model
+                )
+                draft_task = (
+                    f"【验收条件制定任务（规划期）】\n"
+                    f"迭代目标：{task}\n\n"
+                    f"你是验收标准的制定者，不是执行者。请基于迭代目标制定一套机器可验证的硬性验收条件（condition_gate 规格）。\n"
+                    f"可用条件类型：file_exists / file_count_min / file_size_min / content_contains / "
+                    f"text_search / code_reference_integrity / command / script。\n"
+                    f"要求：条件必须客观可判定、与任务硬指标一一对应、避免主观描述；若项目存在 models/ 资产目录，"
+                    f"必须包含资产引用完整性检查；不要包含无法在本机验证的条件。\n"
+                    f"输出格式：仅在报告中输出一个 ```json 代码块，内容为 {{\"mode\": \"all\", \"conditions\": [...]}} 规格，"
+                    f"不要输出其它 JSON。"
+                )
+                draft_res = analyst_harness.run(draft_task)
+                draft_spec = self._extract_conditions_json(draft_res.get("last_message", ""))
+                if draft_spec:
+                    gate_spec = draft_spec
+                    default_bus.publish(EventType.PIPELINE_STEP, {
+                        "stage": "conditions_drafted_by_analyst",
+                        "conditions_count": len(gate_spec.get("conditions", []))
+                    })
+            except Exception as exc:
+                default_bus.publish(EventType.PIPELINE_STEP, {
+                    "stage": "conditions_draft_error", "error": str(exc)
+                })
+        if gate_spec:
+            # Baselines are harness-owned and always merged; spec then pinned.
+            gate_spec = self._merge_baseline_conditions(gate_spec, proj.path)
+            pinned_hash = self._pin_conditions(gate_spec, proj.path)
+            default_bus.publish(EventType.PIPELINE_STEP, {
+                "stage": "conditions_pinned",
+                "sha256": pinned_hash[:16],
+                "source": "user" if conditions else "analyst+baseline"
+            })
+
+        # ------------------------------------------------------------------
         # Phase 0: Concurrent Analyst Swarm – Deep Code Analysis & Proposals
         # ------------------------------------------------------------------
         default_bus.publish(EventType.PIPELINE_STEP, {"stage": "analyst_pre_pass", "role": "analyst"})
@@ -847,7 +892,8 @@ class ConcurrentModularPipeline:
                     analysis_content=analysis_content,
                     project_path=proj.path,
                     active_model=active_model,
-                    conditions=gate_spec
+                    conditions=gate_spec,
+                    pinned_hash=pinned_hash
                 ): f
                 for f in target_files
             }
@@ -1002,7 +1048,32 @@ class ConcurrentModularPipeline:
         with open(summary_abs, "w", encoding="utf-8") as sf:
             sf.write(summary)
 
-        git_res = self.tdd_gate.verify_and_git_gate(f"fix(iteration): {task[:60]}")
+        git_res = None
+        if conditions_passed and len(failed_files) == 0:
+            git_res = self.tdd_gate.verify_and_git_gate(f"fix(iteration): {task[:60]}")
+        else:
+            # Hard reject: acceptance conditions failed (or fix workers failed).
+            # NEVER commit — rollback scoped to the project directory only.
+            reason = (
+                f"conditions gate failed: {gate_verdict.get('failure_summary', '')}"
+                if not conditions_passed else
+                f"fix workers failed: {failed_files}"
+            )
+            default_bus.publish(EventType.GIT_ACTION, {
+                "action": "rollback_trigger", "reason": reason
+            })
+            try:
+                rel = os.path.relpath(proj.path, self.tdd_gate.repo_root)
+                rb_params = {"action": "rollback", "cwd": self.tdd_gate.repo_root}
+                if rel and rel != "." and not rel.startswith(".."):
+                    rb_params["path"] = rel
+                rollback_res = tools.execute_tool("git_tool", rb_params)
+                default_bus.publish(EventType.GIT_ACTION, {
+                    "action": "rolled_back", "result": rollback_res
+                })
+                git_res = {"success": False, "action": "rolled_back", "reason": reason}
+            except Exception as exc:
+                git_res = {"success": False, "action": "rollback_error", "error": str(exc), "reason": reason}
 
         return {
             "success": len(failed_files) == 0 and conditions_passed,
@@ -1027,6 +1098,85 @@ class ConcurrentModularPipeline:
                 return hashlib.md5(f.read()).hexdigest()
         except Exception:
             return None
+
+    # ------------------------------------------------------------------
+    # Acceptance authority helpers (trust layering):
+    # L0 user CLI conditions > L1 analyst/planner-drafted conditions (pinned)
+    # L2 coder CHECK_SCRIPTs are self-checks only and never grant acceptance.
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _extract_conditions_json(text: str) -> Optional[Dict[str, Any]]:
+        """Extract a condition_gate spec (JSON) drafted by an agent from its message."""
+        if not text:
+            return None
+        candidates = []
+        m = re.search(r"```json\s*(\{.*?\})\s*```", text, re.DOTALL)
+        if m:
+            candidates.append(m.group(1))
+        else:
+            m2 = re.search(r"(\{[^{}]*\"conditions\".*\})", text, re.DOTALL)
+            if m2:
+                candidates.append(m2.group(1))
+        # Bare JSON array of conditions (also inside ```json fences)
+        m3 = re.search(r"(\[\s*\{.*?\}\s*(?:,\s*\{.*?\}\s*)*\])", text, re.DOTALL)
+        if m3:
+            candidates.append(m3.group(1))
+        for c in candidates:
+            try:
+                spec = json.loads(c)
+            except Exception:
+                continue
+            if isinstance(spec, dict) and spec.get("conditions"):
+                return spec
+            if isinstance(spec, list) and spec:
+                return {"mode": "all", "conditions": spec}
+        return None
+
+    def _pin_conditions(self, spec: Dict[str, Any], project_path: str) -> str:
+        """Persist the active condition spec and pin its SHA256. Returns the hash."""
+        import hashlib
+        cond_path = os.path.join(project_path, "deliverables", "acceptance_conditions.json")
+        os.makedirs(os.path.dirname(cond_path), exist_ok=True)
+        with open(cond_path, "w", encoding="utf-8") as f:
+            json.dump(spec, f, ensure_ascii=False, indent=2)
+        with open(cond_path, "rb") as f:
+            digest = hashlib.sha256(f.read()).hexdigest()
+        with open(cond_path + ".sha256", "w", encoding="utf-8") as f:
+            f.write(digest)
+        return digest
+
+    def _conditions_tamper_error(self, project_path: str, pinned_hash: str) -> str:
+        """Non-empty error when the pinned conditions file was modified/deleted on disk."""
+        if not pinned_hash:
+            return ""
+        cond_path = os.path.join(project_path, "deliverables", "acceptance_conditions.json")
+        if not os.path.exists(cond_path):
+            return "验收条件文件 deliverables/acceptance_conditions.json 被删除——验收条件由规划期制定，coder 无权修改或删除！"
+        import hashlib
+        with open(cond_path, "rb") as f:
+            digest = hashlib.sha256(f.read()).hexdigest()
+        if digest != pinned_hash:
+            return "验收条件文件被篡改（SHA256 不符）——门禁以管线内存中的原始条件为准，篡改无效且触发返工！"
+        return ""
+
+    @staticmethod
+    def _merge_baseline_conditions(gate_spec: Any, project_path: str) -> Dict[str, Any]:
+        """Auto-inject non-negotiable baseline conditions (harness-owned, not agent-authored)."""
+        spec = dict(gate_spec) if isinstance(gate_spec, dict) else {"mode": "all", "conditions": gate_spec}
+        conds = spec.get("conditions")
+        if isinstance(conds, dict):
+            conds = [conds]
+        conds = list(conds or [])
+        existing_types = {c.get("type") for c in conds if isinstance(c, dict)}
+        if os.path.isdir(os.path.join(project_path, "models")) and "code_reference_integrity" not in existing_types:
+            conds.append({
+                "type": "code_reference_integrity",
+                "scan_glob": "*.js",
+                "ref_regex": r"models/[\w./-]+\.(?:glb|gltf)",
+                "min_refs": 1
+            })
+        spec["conditions"] = conds
+        return spec
 
     def _verify_check_scripts(self, project_path: str, report_file: str) -> str:
         """
@@ -1083,7 +1233,8 @@ class ConcurrentModularPipeline:
         analysis_content: str,
         project_path: str,
         active_model: str,
-        conditions: Optional[Dict[str, Any]] = None
+        conditions: Optional[Dict[str, Any]] = None,
+        pinned_hash: str = ""
     ) -> Dict[str, Any]:
         """Runs Coder -> Reviewer fix cycle for a single file in iteration mode."""
         mod_name = os.path.splitext(os.path.basename(target_file))[0]
@@ -1140,6 +1291,10 @@ class ConcurrentModularPipeline:
 
             # Hard gate: machine-checkable conditions (condition_gate)
             if conditions:
+                tamper = self._conditions_tamper_error(project_path, pinned_hash)
+                if tamper:
+                    last_error = f"{tamper}（判定以管线内存中的原始条件为准；你的自检脚本仅为自检，不构成验收依据）"
+                    continue
                 gate = tools.execute_tool("condition_gate", {"conditions": conditions})
                 gate_data = gate.get("data", {}) if isinstance(gate, dict) else {}
                 if not gate_data.get("passed", False):

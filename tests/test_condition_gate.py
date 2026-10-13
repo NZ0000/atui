@@ -188,3 +188,44 @@ def test_script_syntax_precheck_rejects_broken_script():
             "root_dir": tmp
         })
         assert res["data"]["passed"] is True
+
+
+def test_code_reference_integrity_condition():
+    """Every referenced asset in scanned source files must exist on disk."""
+    with tempfile.TemporaryDirectory() as tmp:
+        os.makedirs(os.path.join(tmp, "models"))
+        with open(os.path.join(tmp, "models", "flamingo.glb"), "wb") as f:
+            f.write(b"x" * 2048)
+        with open(os.path.join(tmp, "index.js"), "w") as f:
+            f.write("loader.load('models/flamingo.glb', cb); loader.load('models/ghost.glb', cb);")
+
+        res = tools.execute_tool("condition_gate", {
+            "conditions": [{"type": "code_reference_integrity", "scan_glob": "*.js",
+                            "ref_regex": r"models/[\w./-]+\.glb", "min_refs": 1}],
+            "root_dir": tmp
+        })
+        assert res["data"]["passed"] is False
+        assert "ghost.glb" in res["data"]["failure_summary"]
+
+        os.remove(os.path.join(tmp, "models", "flamingo.glb"))
+        os.rename(os.path.join(tmp, "models"), os.path.join(tmp, "models_bak"))
+        os.makedirs(os.path.join(tmp, "models"))
+        # now only ghost.glb referenced and missing -> still fail; then add file
+        with open(os.path.join(tmp, "models", "ghost.glb"), "wb") as f:
+            f.write(b"y" * 2048)
+        res = tools.execute_tool("condition_gate", {
+            "conditions": [{"type": "code_reference_integrity", "scan_glob": "*.js",
+                            "ref_regex": r"models/[\w./-]+\.glb", "min_refs": 1}],
+            "root_dir": tmp
+        })
+        # flamingo ref now missing -> fail
+        assert res["data"]["passed"] is False
+
+        with open(os.path.join(tmp, "models", "flamingo.glb"), "wb") as f:
+            f.write(b"z" * 2048)
+        res = tools.execute_tool("condition_gate", {
+            "conditions": [{"type": "code_reference_integrity", "scan_glob": "*.js",
+                            "ref_regex": r"models/[\w./-]+\.glb", "min_refs": 1}],
+            "root_dir": tmp
+        })
+        assert res["data"]["passed"] is True

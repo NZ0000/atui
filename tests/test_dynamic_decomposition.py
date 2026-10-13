@@ -203,3 +203,52 @@ def test_verify_check_scripts_gate():
         with open(os.path.join(tmp, "report_missing.md"), "w", encoding="utf-8") as f:
             f.write("CHECK_SCRIPT: checks/nope.py\n")
         assert "不存在" in pipeline._verify_check_scripts(tmp, "report_missing.md")
+
+
+def test_acceptance_authority_helpers():
+    """Trust layering: analyst-drafted conditions extraction, baseline merge, pin/tamper."""
+    import tempfile
+    import hashlib as _hashlib
+    pipeline = ConcurrentModularPipeline()
+
+    # --- extract conditions JSON from agent output ---
+    assert pipeline._extract_conditions_json("") is None
+    assert pipeline._extract_conditions_json("no json here") is None
+    spec = pipeline._extract_conditions_json(
+        '前言\n```json\n{"mode": "all", "conditions": [{"type": "file_exists", "path": "a.glb"}]}\n```\n后记'
+    )
+    assert spec and spec["conditions"][0]["type"] == "file_exists"
+    spec2 = pipeline._extract_conditions_json(
+        'plain {"conditions": [{"type": "command", "cmd": "true"}]} trailing'
+    )
+    assert spec2 and spec2["conditions"][0]["type"] == "command"
+    # bare list is normalized
+    spec3 = pipeline._extract_conditions_json('[{"type": "command", "cmd": "true"}]')
+    assert spec3 and spec3["mode"] == "all"
+
+    with tempfile.TemporaryDirectory() as tmp:
+        # --- baseline merge: auto-inject asset integrity when models/ exists ---
+        os.makedirs(os.path.join(tmp, "models"))
+        merged = pipeline._merge_baseline_conditions({"mode": "all", "conditions": []}, tmp)
+        types = [c["type"] for c in merged["conditions"]]
+        assert "code_reference_integrity" in types
+        # no duplicate injection
+        merged2 = pipeline._merge_baseline_conditions(merged, tmp)
+        assert [c["type"] for c in merged2["conditions"]].count("code_reference_integrity") == 1
+        # no models dir -> no baseline
+        with tempfile.TemporaryDirectory() as tmp2:
+            merged3 = pipeline._merge_baseline_conditions({"mode": "all", "conditions": []}, tmp2)
+            assert merged3["conditions"] == []
+
+        # --- pin + tamper detection ---
+        h1 = pipeline._pin_conditions(merged, tmp)
+        assert len(h1) == 64
+        assert pipeline._conditions_tamper_error(tmp, h1) == ""
+        # tamper: modify conditions file
+        with open(os.path.join(tmp, "deliverables", "acceptance_conditions.json"), "w") as f:
+            json.dump({"mode": "all", "conditions": [{"type": "command", "cmd": "true"}]}, f)
+        err = pipeline._conditions_tamper_error(tmp, h1)
+        assert "篡改" in err
+        # delete file
+        os.remove(os.path.join(tmp, "deliverables", "acceptance_conditions.json"))
+        assert "删除" in pipeline._conditions_tamper_error(tmp, h1)

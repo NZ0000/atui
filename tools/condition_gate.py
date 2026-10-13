@@ -169,6 +169,33 @@ def _check_one(cond: Dict[str, Any], root: str) -> Dict[str, Any]:
             res.update(passed=total >= minimum,
                        detail=f"query '{cond.get('query')}' matched {total} lines, required >= {minimum}")
 
+        elif ctype == "code_reference_integrity":
+            # Generic asset/link integrity: every reference matching ref_regex found in
+            # scanned source files must exist on disk (prevents 404-class runtime errors).
+            import re as _re
+            scan_glob = cond.get("scan_glob", "*.js")
+            ref_regex = cond.get("ref_regex", r"models/[\w./-]+\.(?:glb|gltf)")
+            minimum = int(cond.get("min_refs", 1))
+            skip_dirs = {"node_modules", ".git", "vendor", "models", "deliverables", "__pycache__"}
+            refs = set()
+            for dirpath, dirnames, filenames in os.walk(root):
+                dirnames[:] = [d for d in dirnames if d not in skip_dirs]
+                for fn in filenames:
+                    if not fnmatch.fnmatch(fn, scan_glob):
+                        continue
+                    ap = os.path.join(dirpath, fn)
+                    try:
+                        with open(ap, "r", encoding="utf-8", errors="ignore") as f:
+                            refs.update(m.group(0) for m in _re.finditer(ref_regex, f.read()))
+                    except Exception:
+                        continue
+            missing = sorted(r for r in refs if not os.path.exists(os.path.join(root, r)))
+            ok = (len(refs) >= minimum) and not missing
+            detail = f"found {len(refs)} refs (required >= {minimum})"
+            if missing:
+                detail += f"; MISSING TARGETS: {missing[:8]}"
+            res.update(passed=ok, detail=detail)
+
         elif ctype in ("command", "script"):
             if ctype == "script":
                 script_path = cond.get("path", "")

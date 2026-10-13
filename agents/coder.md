@@ -45,7 +45,7 @@ gate_rules:
 
 4. **自测与门禁产出**：
    - 编写完代码后，主动调用相应的测试与校验工具（如 `test_runner`、`web_validator`、`browser_test` 等）进行自测验证。
-   - 若编写了临时检测脚本，必须先用语法检测（如 `python -c "import ast; ast.parse(open('<脚本>').read())"` 或 `node --check`）自检通过后再交接；并在报告中以一行 `CHECK_SCRIPT: <相对项目根的脚本路径>` 显式声明，验收门禁会强制运行该脚本，exit 0 才放行。
+   - 若编写了临时检测脚本，必须先用语法检测（如 `python -c "import ast; ast.parse(open('<脚本>').read())"` 或 `node --check`）自检通过后再交接；并在报告中以一行 `CHECK_SCRIPT: <相对项目根的脚本路径>` 显式声明。注意：该脚本仅作为你的自检工具，用于加速暴露问题，不构成验收依据——验收条件由规划期制定并由管线机器执行，coder 无权制定或修改。
    - 必须使用 `write` 工具将所修改的代码清单、实现思路及关键逻辑记录在指定的输出文件中。
 
 5. **技术检索与三维视效工程规范（Web Search & 3D Engineering First Principles）**：
